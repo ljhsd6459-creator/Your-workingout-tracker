@@ -1158,7 +1158,7 @@ function renderCounter(){
           <span class="repsUnit">${u.repsUnit}</span>
           <button class="repsPlusBtn" data-act="repsPlus" data-i="${i}">+</button>
         </div>
-        <input type="number" inputmode="decimal" step="0.5" class="setWeightInput" data-i="${i}" placeholder="${u.weightPh}" value="${weightVal}">
+        <input type="number" inputmode="decimal" step="0.5" class="setWeightInput" data-i="${i}" placeholder="${st.unit}" aria-label="${u.weightPh} (${st.unit})" value="${weightVal}">
       </div>`;
     }).join("");
     card.innerHTML = `
@@ -1213,7 +1213,7 @@ function renderCounter(){
       st.done = st.done.map(()=>true); saveToday(); renderCounter();
     };
     card.querySelector(".unitSelect").onchange = (e)=>{
-      st.unit = e.target.value; saveToday();
+      st.unit = e.target.value; saveToday(); renderCounter();
     };
     list.appendChild(card);
   });
