@@ -119,6 +119,19 @@
     background:rgba(90,209,201,.12); border:1px solid var(--accent,#5ad1c9); color:var(--accent,#5ad1c9);
     border-radius:10px; padding:9px 12px; font-size:13px; font-weight:600; text-align:center; margin-bottom:10px;
   }
+  .selectGuideBanner{
+    background:rgba(90,209,201,.12); border:1px solid var(--accent,#5ad1c9);
+    border-radius:10px; padding:10px 12px; margin-bottom:10px;
+  }
+  .selectGuideMsg{
+    color:var(--accent,#5ad1c9); font-size:13px; font-weight:600; text-align:center; margin-bottom:8px;
+  }
+  .selectGuideBtnRow{display:flex; gap:8px; justify-content:center;}
+  .selectGuideBtn{
+    background:transparent; border:1px solid var(--border); color:var(--muted);
+    font-size:11.5px; padding:5px 10px; border-radius:14px;
+  }
+  .selectGuideBtn:active{opacity:.7;}
   .setDoneBtn{
     width:40px;height:40px;border-radius:50%; border:2px dashed var(--muted,#9aa3af); background:var(--card2);
     color:var(--text); font-weight:700; font-size:14px; flex:0 0 auto;
@@ -268,6 +281,13 @@
 <main>
   <section class="tabpanel active" id="tab-select">
     <div class="catbar" id="catbar"></div>
+    <div class="selectGuideBanner" id="selectGuideBanner" style="display:none;">
+      <div class="selectGuideMsg" id="selectGuideMsgText"></div>
+      <div class="selectGuideBtnRow">
+        <button class="selectGuideBtn" id="selectGuideSnoozeBtn" onclick="dismissSelectGuide('snooze')"></button>
+        <button class="selectGuideBtn" id="selectGuideNeverBtn" onclick="dismissSelectGuide('never')"></button>
+      </div>
+    </div>
     <div id="exerciseList"></div>
 
     <div class="addbox">
@@ -512,6 +532,9 @@ const UI = {
     sets:"세트", weightPh:"무게 입력",
     counterTapHint:"👇 아래 번호를 탭하면 그 세트가 완료 체크돼요",
     counterEmpty:'아직 선택한 운동이 없어요.<br>"운동 선택" 탭에서 오늘 할 운동을 골라주세요.',
+    selectGuideMsg:"✅ 추가됐어요! 카운터 탭에서 세트를 시작하세요",
+    selectGuideSnooze7:"7일간 보지 않기",
+    selectGuideNeverShow:"다시 보지 않기",
     historyEmpty:'아직 저장된 기록이 없어요.',
     progressLabel:(done,total,pct)=>`${done} / ${total} 세트 완료 (${pct}%)`,
     toastNeedName:"운동 이름을 입력해주세요", toastAdded:"운동이 추가되었어요 ✅",
@@ -578,6 +601,9 @@ const UI = {
     sets:"sets", weightPh:"Enter weight",
     counterTapHint:"👇 Tap a number below to mark that set done",
     counterEmpty:'No exercises selected yet.<br>Pick today\'s exercises in the "Select" tab.',
+    selectGuideMsg:"✅ Added! Head to the Counter tab to start your sets",
+    selectGuideSnooze7:"Don't show for 7 days",
+    selectGuideNeverShow:"Don't show again",
     historyEmpty:'No saved records yet.',
     progressLabel:(done,total,pct)=>`${done} / ${total} sets done (${pct}%)`,
     toastNeedName:"Please enter an exercise name", toastAdded:"Exercise added ✅",
@@ -925,6 +951,12 @@ function toggleLang(){
   renderCalendar();
   renderRunHistory();
   renderRunCalendar();
+  if(document.getElementById("selectGuideBanner").style.display !== "none"){
+    const u = t();
+    document.getElementById("selectGuideMsgText").textContent = u.selectGuideMsg;
+    document.getElementById("selectGuideSnoozeBtn").textContent = u.selectGuideSnooze7;
+    document.getElementById("selectGuideNeverBtn").textContent = u.selectGuideNeverShow;
+  }
 }
 
 function renderNoteBox(){
@@ -1030,8 +1062,10 @@ function renderExerciseList(){
     `;
     row.addEventListener("click", (e)=>{
       if(e.target.closest(".setstep") || e.target.closest(".info") || e.target.closest(".exTip")) return;
+      const wasAnySelected = Object.values(todayState).some(s=>s.checked);
       st.checked = !st.checked;
       saveToday(); renderExerciseList();
+      if(st.checked && !wasAnySelected) maybeShowSelectGuide();
     });
     row.querySelector('[data-act="dec"]').onclick = (e)=>{ e.stopPropagation(); st.sets = Math.max(2, st.sets-1); syncDoneLength(st); saveToday(); renderExerciseList(); };
     row.querySelector('[data-act="inc"]').onclick = (e)=>{ e.stopPropagation(); st.sets = Math.min(5, st.sets+1); syncDoneLength(st); saveToday(); renderExerciseList(); };
@@ -1922,12 +1956,46 @@ function switchTab(id){
   document.querySelectorAll(".tabpanel").forEach(p=>p.classList.remove("active"));
   document.getElementById(id).classList.add("active");
   document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.toggle("active", b.dataset.tab===id));
-  if(id==="tab-counter") renderCounter();
+  if(id==="tab-counter"){ renderCounter(); hideSelectGuide(); }
   if(id==="tab-journal"){ renderHistory(); renderCalendar(); }
   if(id==="tab-running"){
     if(!document.getElementById("runDateInput").value) document.getElementById("runDateInput").value = todayDateKey();
     renderRunHistory(); renderRunCalendar();
   }
+}
+
+/* ===================== 운동 선택 안내 배너 ===================== */
+const SELECT_GUIDE_NEVER_KEY = "gb_selectGuideNeverShow";
+const SELECT_GUIDE_SNOOZE_KEY = "gb_selectGuideSnoozeUntil";
+
+function shouldShowSelectGuide(){
+  if(localStorage.getItem(SELECT_GUIDE_NEVER_KEY) === "1") return false;
+  const snoozeUntil = parseInt(localStorage.getItem(SELECT_GUIDE_SNOOZE_KEY) || "0", 10);
+  if(Date.now() < snoozeUntil) return false;
+  return true;
+}
+
+function maybeShowSelectGuide(){
+  if(!shouldShowSelectGuide()) return;
+  const u = t();
+  document.getElementById("selectGuideMsgText").textContent = u.selectGuideMsg;
+  document.getElementById("selectGuideSnoozeBtn").textContent = u.selectGuideSnooze7;
+  document.getElementById("selectGuideNeverBtn").textContent = u.selectGuideNeverShow;
+  document.getElementById("selectGuideBanner").style.display = "block";
+}
+
+function hideSelectGuide(){
+  const b = document.getElementById("selectGuideBanner");
+  if(b) b.style.display = "none";
+}
+
+function dismissSelectGuide(mode){
+  if(mode === "snooze"){
+    localStorage.setItem(SELECT_GUIDE_SNOOZE_KEY, String(Date.now() + 7*24*60*60*1000));
+  } else if(mode === "never"){
+    localStorage.setItem(SELECT_GUIDE_NEVER_KEY, "1");
+  }
+  hideSelectGuide();
 }
 /* ===================== 운동 수정/삭제 ===================== */
 let editingCat = null;
