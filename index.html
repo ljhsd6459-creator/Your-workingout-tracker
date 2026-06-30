@@ -115,11 +115,24 @@
   /* 세트별 행 (reps stepper + per-set weight) */
   .setRows{display:flex; flex-direction:column; gap:8px;}
   .setRow{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
-  .setDoneBtn{
-    width:36px;height:36px;border-radius:50%; border:2px solid var(--border); background:var(--card2);
-    color:var(--text); font-weight:700; font-size:13px; flex:0 0 auto;
+  .counterHint{
+    background:rgba(90,209,201,.12); border:1px solid var(--accent,#5ad1c9); color:var(--accent,#5ad1c9);
+    border-radius:10px; padding:9px 12px; font-size:13px; font-weight:600; text-align:center; margin-bottom:10px;
   }
-  .setDoneBtn.done{background:var(--good); color:#06201e; border-color:var(--good);}
+  .setDoneBtn{
+    width:40px;height:40px;border-radius:50%; border:2px dashed var(--muted,#9aa3af); background:var(--card2);
+    color:var(--text); font-weight:700; font-size:14px; flex:0 0 auto;
+    box-shadow:0 0 0 0 rgba(90,209,201,.5); animation:tapPulse 1.8s ease-in-out infinite;
+  }
+  .setDoneBtn.done{
+    background:var(--good); color:#06201e; border-color:var(--good); border-style:solid;
+    font-size:16px; animation:none; box-shadow:none;
+  }
+  @keyframes tapPulse{
+    0%{box-shadow:0 0 0 0 rgba(90,209,201,.45);}
+    70%{box-shadow:0 0 0 8px rgba(90,209,201,0);}
+    100%{box-shadow:0 0 0 0 rgba(90,209,201,0);}
+  }
   .repsStepper{display:flex; align-items:center; gap:4px; flex:0 0 auto;}
   .repsMinusBtn, .repsPlusBtn{
     width:36px;height:36px;border-radius:8px; border:1px solid var(--border); background:var(--card2);
@@ -425,8 +438,8 @@
 </div>
 <div class="modal-overlay" id="feedbackModalOverlay">
   <div class="modal">
-    <h4>피드백 보내기</h4>
-    <p style="font-size:12.5px; color:var(--muted); margin:0 0 8px; line-height:1.5;">불편한 점, 버그, 추가됐으면 하는 기능 등 자유롭게 적어주세요. "보내기"를 누르면 메일 앱이 열려요.</p>
+    <h4 id="feedbackModalTitle">피드백 보내기</h4>
+    <p id="feedbackModalDesc" style="font-size:12.5px; color:var(--muted); margin:0 0 8px; line-height:1.5;">불편한 점, 버그, 추가됐으면 하는 기능 등 자유롭게 적어주세요. "보내기"를 누르면 메일 앱이 열려요.</p>
     <textarea id="feedbackInput" placeholder="여기에 의견을 적어주세요"></textarea>
     <div class="modalBtnRow">
       <button class="modalSave" id="feedbackSendBtn" onclick="sendFeedback()">보내기</button>
@@ -497,6 +510,7 @@ const UI = {
     titleModalTitle:"앱 제목 수정", titleModalPh:"앱 제목을 입력하세요", titleModalSave:"저장", titleModalClear:"기본값으로", titleModalClose:"닫기",
     toastTitleSaved:"제목을 변경했어요 ✅",
     sets:"세트", weightPh:"무게 입력",
+    counterTapHint:"👇 아래 번호를 탭하면 그 세트가 완료 체크돼요",
     counterEmpty:'아직 선택한 운동이 없어요.<br>"운동 선택" 탭에서 오늘 할 운동을 골라주세요.',
     historyEmpty:'아직 저장된 기록이 없어요.',
     progressLabel:(done,total,pct)=>`${done} / ${total} 세트 완료 (${pct}%)`,
@@ -539,7 +553,15 @@ const UI = {
     journalDuration:(m,s)=>`⏱️ 총 운동 시간: ${m}분 ${s}초`,
     backupTitle:"💾 데이터 백업", backupExport:"내보내기", backupImport:"가져오기",
     toastBackupExported:"백업 파일을 내보냈어요 💾", toastBackupImported:"백업을 가져왔어요. 새로고침할게요 ✅",
-    toastBackupImportFailed:"백업 가져오기에 실패했어요 ❌"
+    toastBackupImportFailed:"백업 가져오기에 실패했어요 ❌",
+    feedbackBtnTitle:"피드백 보내기",
+    feedbackModalTitle:"피드백 보내기",
+    feedbackModalDesc:'불편한 점, 버그, 추가됐으면 하는 기능 등 자유롭게 적어주세요. "보내기"를 누르면 메일 앱이 열려요.',
+    feedbackInputPh:"여기에 의견을 적어주세요",
+    feedbackSend:"보내기", feedbackClose:"닫기",
+    feedbackSubject:"운동 트래커 피드백",
+    toastFeedbackNeedText:"내용을 입력해주세요",
+    toastFeedbackSent:"메일 앱이 열려요. 보내기를 눌러 완료해주세요"
   },
   en: {
     appTitle:"🏋️ My PT Workout Tracker", langBtn:"한국어",
@@ -554,6 +576,7 @@ const UI = {
     titleModalTitle:"Edit App Title", titleModalPh:"Enter the app title", titleModalSave:"Save", titleModalClear:"Reset to default", titleModalClose:"Close",
     toastTitleSaved:"Title updated ✅",
     sets:"sets", weightPh:"Enter weight",
+    counterTapHint:"👇 Tap a number below to mark that set done",
     counterEmpty:'No exercises selected yet.<br>Pick today\'s exercises in the "Select" tab.',
     historyEmpty:'No saved records yet.',
     progressLabel:(done,total,pct)=>`${done} / ${total} sets done (${pct}%)`,
@@ -596,7 +619,15 @@ const UI = {
     journalDuration:(m,s)=>`⏱️ Total workout time: ${m}m ${s}s`,
     backupTitle:"💾 Data Backup", backupExport:"Export", backupImport:"Import",
     toastBackupExported:"Backup exported 💾", toastBackupImported:"Backup imported. Reloading ✅",
-    toastBackupImportFailed:"Failed to import backup ❌"
+    toastBackupImportFailed:"Failed to import backup ❌",
+    feedbackBtnTitle:"Send feedback",
+    feedbackModalTitle:"Send Feedback",
+    feedbackModalDesc:'Feel free to share any issues, bugs, or features you\'d like to see. Tapping "Send" will open your mail app.',
+    feedbackInputPh:"Write your feedback here",
+    feedbackSend:"Send", feedbackClose:"Close",
+    feedbackSubject:"Workout Tracker Feedback",
+    toastFeedbackNeedText:"Please enter your feedback",
+    toastFeedbackSent:"Your mail app should be open — tap send to finish"
   }
 };
 function t(){ return UI[currentLang] || UI.ko; }
@@ -871,6 +902,12 @@ function applyStaticLanguage(){
   document.getElementById("backupTitle").textContent = u.backupTitle;
   document.getElementById("backupExportBtn").textContent = u.backupExport;
   document.getElementById("backupImportBtn").textContent = u.backupImport;
+  document.getElementById("feedbackBtn").title = u.feedbackBtnTitle;
+  document.getElementById("feedbackModalTitle").textContent = u.feedbackModalTitle;
+  document.getElementById("feedbackModalDesc").textContent = u.feedbackModalDesc;
+  document.getElementById("feedbackInput").placeholder = u.feedbackInputPh;
+  document.getElementById("feedbackSendBtn").textContent = u.feedbackSend;
+  document.getElementById("feedbackCloseBtn").textContent = u.feedbackClose;
   if(typeof refreshWorkoutTimerButton === "function") refreshWorkoutTimerButton();
   renderTodayLabel();
   renderNoteBox();
@@ -942,12 +979,12 @@ function closeFeedback(){
 }
 function sendFeedback(){
   const val = document.getElementById("feedbackInput").value.trim();
-  if(!val){ showToast("내용을 입력해주세요"); return; }
-  const subject = encodeURIComponent("운동 트래커 피드백");
+  if(!val){ showToast(t().toastFeedbackNeedText); return; }
+  const subject = encodeURIComponent(t().feedbackSubject);
   const body = encodeURIComponent(val);
   window.location.href = `mailto:${FEEDBACK_EMAIL}?subject=${subject}&body=${body}`;
   closeFeedback();
-  showToast("메일 앱이 열려요. 보내기를 눌러 완료해주세요");
+  showToast(t().toastFeedbackSent);
 }
 
 function renderCatbar(){
@@ -1057,8 +1094,15 @@ function renderCounter(){
   const entries = Object.keys(todayState).filter(id=>todayState[id].checked);
   if(entries.length===0){
     list.innerHTML = `<div class="empty">${u.counterEmpty}</div>`;
+    const oldHint = document.getElementById("counterTapHint");
+    if(oldHint) oldHint.remove();
     updateProgress();
     return;
+  }
+  if(!document.getElementById("counterTapHint")){
+    list.insertAdjacentHTML("beforebegin", `<div class="counterHint" id="counterTapHint">${u.counterTapHint}</div>`);
+  } else {
+    document.getElementById("counterTapHint").textContent = u.counterTapHint;
   }
   entries.forEach(id=>{
     const st = todayState[id];
@@ -1073,7 +1117,7 @@ function renderCounter(){
       const weightVal = (st.weights[i]!==undefined && st.weights[i]!==null) ? st.weights[i] : "";
       return `
       <div class="setRow" data-i="${i}">
-        <button class="setDoneBtn ${d?'done':''}" data-act="toggleDone" data-i="${i}">${i+1}</button>
+        <button class="setDoneBtn ${d?'done':''}" data-act="toggleDone" data-i="${i}">${d?'✓':i+1}</button>
         <div class="repsStepper">
           <button class="repsMinusBtn" data-act="repsMinus" data-i="${i}">−</button>
           <span class="repsValue" data-i="${i}">${reps}</span>
@@ -2183,5 +2227,6 @@ renderRunCalendar();
 initWorkoutTimerUI();
 if(didResetForNewDay){ showToast(t().toastNewDay); }
 </script>
+<script data-goatcounter="https://ljhsd6459.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </body>
 </html>
