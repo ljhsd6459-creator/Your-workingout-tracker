@@ -427,6 +427,8 @@
     <h4 id="modalTitle">운동 수정</h4>
     <input id="modalNameInput" placeholder="운동 이름">
     <textarea id="modalTipInput" placeholder="PT 팁 / 메모"></textarea>
+    <label id="modalCatLabel" style="font-size:12px;color:var(--muted);margin-top:8px;display:block;">카테고리</label>
+    <select id="modalCatSelect" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:14px;margin-top:4px;"></select>
     <div class="modalBtnRow">
       <button class="modalSave" id="modalSaveBtn" onclick="saveModalEdit()">저장</button>
       <button class="modalDelete" id="modalDeleteBtn" onclick="deleteModalExercise()">삭제</button>
@@ -575,7 +577,7 @@ const UI = {
     genJournal:"📝 일지 자동 작성", copyJournal:"📋 복사하기", saveHistory:"💾 오늘 기록 저장", historyHeader:"지난 기록",
     journalPh:"오늘 운동을 선택하고 세트를 체크한 뒤, '일지 자동 작성'을 눌러보세요.",
     navSelect:"운동 선택", navCounter:"카운터", navJournal:"일지",
-    modalTitle:"운동 수정", modalNamePh:"운동 이름", modalTipPh:"PT 팁 / 메모", modalSave:"저장", modalDelete:"삭제", modalClose:"닫기",
+    modalTitle:"운동 수정", modalNamePh:"운동 이름", modalTipPh:"PT 팁 / 메모", modalCatLabel:"카테고리", modalSave:"저장", modalDelete:"삭제", modalClose:"닫기",
     noteModalTitle:"개인 특이사항 수정", noteModalPh:"개인 특이사항을 입력하세요", noteModalSave:"저장", noteModalClear:"비우기", noteModalClose:"닫기",
     titleModalTitle:"앱 제목 수정", titleModalPh:"앱 제목을 입력하세요", titleModalSave:"저장", titleModalClear:"기본값으로", titleModalClose:"닫기",
     toastTitleSaved:"제목을 변경했어요 ✅",
@@ -644,7 +646,7 @@ const UI = {
     genJournal:"📝 Auto-generate Journal", copyJournal:"📋 Copy", saveHistory:"💾 Save Today's Record", historyHeader:"Past Records",
     journalPh:"Select today's exercises and check off your sets, then tap 'Auto-generate Journal'.",
     navSelect:"Select", navCounter:"Counter", navJournal:"Journal",
-    modalTitle:"Edit Exercise", modalNamePh:"Exercise name", modalTipPh:"PT tip / notes", modalSave:"Save", modalDelete:"Delete", modalClose:"Close",
+    modalTitle:"Edit Exercise", modalNamePh:"Exercise name", modalTipPh:"PT tip / notes", modalCatLabel:"Category", modalSave:"Save", modalDelete:"Delete", modalClose:"Close",
     noteModalTitle:"Edit Personal Notes", noteModalPh:"Enter your personal notes", noteModalSave:"Save", noteModalClear:"Clear", noteModalClose:"Close",
     titleModalTitle:"Edit App Title", titleModalPh:"Enter the app title", titleModalSave:"Save", titleModalClear:"Reset to default", titleModalClose:"Close",
     toastTitleSaved:"Title updated ✅",
@@ -800,6 +802,7 @@ const STORAGE_KEY_DELETED = "wt_deleted_v1";
 const STORAGE_KEY_TODAY_DATE = "wt_today_date_v1";
 const STORAGE_KEY_WORKOUT_TIMER = "wt_workout_timer_v1";
 const STORAGE_KEY_EX_HISTORY = "wt_exHistory_v1"; // 운동별 마지막 기록 (per-exercise, not per-session)
+const STORAGE_KEY_BUILTIN_SNAPSHOT = "wt_builtin_snapshot_v1"; // 내장 운동 스냅샷 (export 복원용)
 
 let currentCat = "등";
 let todayState = loadToday(); // { id: {checked:bool, sets:int, done:[bool,...]} }
@@ -900,6 +903,15 @@ Object.keys(exercisesData).forEach(cat=>{
     ex.id = cat + "__b" + idx;
   });
 });
+
+// 내장 운동 스냅샷을 localStorage에 저장 (export 시 HTML이 달라도 복원 가능하게)
+{
+  const snap = {};
+  Object.keys(exercisesData).forEach(cat=>{
+    snap[cat] = exercisesData[cat].map(ex=>({id:ex.id, name:ex.name, tip:ex.tip||""}));
+  });
+  try{ localStorage.setItem(STORAGE_KEY_BUILTIN_SNAPSHOT, JSON.stringify(snap)); }catch(e){}
+}
 
 // 커스텀 운동 합치기
 (function mergeCustom(){
@@ -1034,6 +1046,7 @@ function applyStaticLanguage(){
   document.getElementById("modalTitle").textContent = u.modalTitle;
   document.getElementById("modalNameInput").placeholder = u.modalNamePh;
   document.getElementById("modalTipInput").placeholder = u.modalTipPh;
+  document.getElementById("modalCatLabel").textContent = u.modalCatLabel;
   document.getElementById("modalSaveBtn").textContent = u.modalSave;
   document.getElementById("modalDeleteBtn").textContent = u.modalDelete;
   document.getElementById("modalCloseBtn").textContent = u.modalClose;
@@ -1219,12 +1232,22 @@ function syncDoneLength(st){
 
 /* ===================== 커스텀 추가 ===================== */
 function renderCatOptions(){
+  const cats = Object.keys(exercisesData);
+  // 추가 폼용 select
   const sel = document.getElementById("newExCat");
   sel.innerHTML = "";
-  Object.keys(exercisesData).forEach(cat=>{
+  cats.forEach(cat=>{
     const o = document.createElement("option");
     o.value = cat; o.textContent = getDisplayCat(cat);
     sel.appendChild(o);
+  });
+  // 수정 모달용 select
+  const msel = document.getElementById("modalCatSelect");
+  msel.innerHTML = "";
+  cats.forEach(cat=>{
+    const o = document.createElement("option");
+    o.value = cat; o.textContent = getDisplayCat(cat);
+    msel.appendChild(o);
   });
 }
 function addCustomExercise(){
@@ -2190,6 +2213,8 @@ function openEditModal(cat, ex){
   editingId = ex.id;
   document.getElementById("modalNameInput").value = ex.name;
   document.getElementById("modalTipInput").value = ex.tip || "";
+  const msel = document.getElementById("modalCatSelect");
+  msel.value = cat;
   document.getElementById("modalOverlay").classList.add("show");
 }
 
@@ -2203,20 +2228,58 @@ function saveModalEdit(){
   if(!ex){ closeModal(); return; }
   const newName = document.getElementById("modalNameInput").value.trim() || ex.name;
   const newTip = document.getElementById("modalTipInput").value;
-  ex.name = newName;
-  ex.tip = newTip;
+  const newCat = document.getElementById("modalCatSelect").value;
+  const catChanged = newCat && newCat !== editingCat;
 
-  if(ex.custom){
-    const custom = loadCustom();
-    const arr = custom[editingCat] || [];
-    const idx = arr.findIndex(e => e.id === editingId);
-    if(idx > -1){ arr[idx].name = newName; arr[idx].tip = newTip; }
-    custom[editingCat] = arr;
-    saveCustom(custom);
+  if(catChanged){
+    // ── 카테고리 이동 ──
+    // 1) 원래 위치에서 제거
+    if(ex.custom){
+      const custom = loadCustom();
+      if(custom[editingCat]) custom[editingCat] = custom[editingCat].filter(e=>e.id!==editingId);
+      // 2) 새 카테고리에 추가 (id 유지)
+      if(!custom[newCat]) custom[newCat] = [];
+      custom[newCat].push({id:editingId, name:newName, tip:newTip, custom:true});
+      saveCustom(custom);
+    } else {
+      // 내장 운동: 원래 위치 숨기기 + 새 카테고리에 커스텀으로 추가
+      const deleted = loadDeleted();
+      if(!deleted.includes(editingId)) deleted.push(editingId);
+      saveDeleted(deleted);
+      const overrides = loadOverrides();
+      delete overrides[editingId]; // override는 더 이상 필요 없음 (custom에 저장)
+      saveOverrides(overrides);
+      const custom = loadCustom();
+      if(!custom[newCat]) custom[newCat] = [];
+      custom[newCat].push({id:editingId, name:newName, tip:newTip, custom:true});
+      saveCustom(custom);
+    }
+    // in-memory에서도 이동
+    const fromArr = exercisesData[editingCat] || [];
+    const fromIdx = fromArr.findIndex(e=>e.id===editingId);
+    if(fromIdx>-1){
+      const moved = fromArr.splice(fromIdx,1)[0];
+      moved.name = newName; moved.tip = newTip; moved.custom = true;
+      if(!exercisesData[newCat]) exercisesData[newCat] = [];
+      exercisesData[newCat].push(moved);
+    }
+    currentCat = newCat;
   } else {
-    const overrides = loadOverrides();
-    overrides[editingId] = {name:newName, tip:newTip};
-    saveOverrides(overrides);
+    // ── 같은 카테고리 내 이름/팁 수정 ──
+    ex.name = newName;
+    ex.tip = newTip;
+    if(ex.custom){
+      const custom = loadCustom();
+      const arr = custom[editingCat] || [];
+      const idx = arr.findIndex(e=>e.id===editingId);
+      if(idx>-1){ arr[idx].name = newName; arr[idx].tip = newTip; }
+      custom[editingCat] = arr;
+      saveCustom(custom);
+    } else {
+      const overrides = loadOverrides();
+      overrides[editingId] = {name:newName, tip:newTip};
+      saveOverrides(overrides);
+    }
   }
 
   if(todayState[editingId]){
@@ -2225,6 +2288,7 @@ function saveModalEdit(){
   }
 
   closeModal();
+  renderCatbar();
   renderExerciseList();
   renderCounter();
   showToast(t().toastUpdated);
@@ -2434,7 +2498,7 @@ const BACKUP_KEYS = [
   STORAGE_KEY_LANG, STORAGE_KEY_NOTE, STORAGE_KEY_TITLE, STORAGE_KEY_RUNS,
   STORAGE_KEY_TODAY, STORAGE_KEY_HISTORY, STORAGE_KEY_CUSTOM, STORAGE_KEY_OVERRIDES,
   STORAGE_KEY_DELETED, STORAGE_KEY_TODAY_DATE, STORAGE_KEY_WORKOUT_TIMER,
-  STORAGE_KEY_EX_HISTORY
+  STORAGE_KEY_EX_HISTORY, STORAGE_KEY_BUILTIN_SNAPSHOT
 ];
 
 function exportBackup(){
@@ -2471,6 +2535,39 @@ function importBackup(event){
           localStorage.setItem(key, data[key]);
         }
       });
+
+      // 백업의 내장 운동 스냅샷과 현재 HTML을 비교해서,
+      // 현재 HTML에 없는 운동은 커스텀 운동으로 자동 복원
+      try{
+        const snap = data[STORAGE_KEY_BUILTIN_SNAPSHOT] ? JSON.parse(data[STORAGE_KEY_BUILTIN_SNAPSHOT]) : null;
+        const deletedIds = data[STORAGE_KEY_DELETED] ? JSON.parse(data[STORAGE_KEY_DELETED]) : [];
+        if(snap){
+          const custom = data[STORAGE_KEY_CUSTOM] ? JSON.parse(data[STORAGE_KEY_CUSTOM]) : {};
+          const overrides = data[STORAGE_KEY_OVERRIDES] ? JSON.parse(data[STORAGE_KEY_OVERRIDES]) : {};
+          let changed = false;
+          Object.keys(snap).forEach(cat=>{
+            snap[cat].forEach(ex=>{
+              // 현재 HTML 내장 운동에 있는지 확인
+              const inBuiltin = (exercisesData[cat]||[]).some(e=>e.id===ex.id);
+              // 이미 커스텀으로 복원돼 있는지 확인
+              const inCustom = (custom[cat]||[]).some(e=>e.id===ex.id);
+              // 사용자가 직접 삭제한 건지 확인
+              const wasDeleted = deletedIds.includes(ex.id);
+              if(!inBuiltin && !inCustom && !wasDeleted){
+                // 백업 당시의 override(이름/팁 수정본) 적용
+                const ov = overrides[ex.id];
+                const name = (ov && ov.name) ? ov.name : ex.name;
+                const tip  = (ov && ov.tip  !== undefined) ? ov.tip  : ex.tip || "";
+                if(!custom[cat]) custom[cat] = [];
+                custom[cat].push({id: ex.id, name, tip, custom:true});
+                changed = true;
+              }
+            });
+          });
+          if(changed) localStorage.setItem(STORAGE_KEY_CUSTOM, JSON.stringify(custom));
+        }
+      }catch(e){}
+
       showToast(t().toastBackupImported);
       setTimeout(()=>{ location.reload(); }, 600);
     }catch(e){
