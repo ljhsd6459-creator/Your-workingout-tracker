@@ -96,6 +96,12 @@
   .counter-card .ctop .actions button{
     background:var(--card2); border:1px solid var(--border); color:var(--muted); border-radius:6px; padding:4px 8px; font-size:12px;
   }
+  .counter-card .ctop .actions button[data-act="remove"]{color:#ff8a8a; font-size:13px;}
+  .prevSessionHint{font-size:11.5px; color:var(--muted); margin:-2px 0 6px; padding:5px 8px; background:rgba(255,255,255,.04); border-radius:6px; line-height:1.5;}
+  .cardRestRow{display:flex; gap:6px; margin-top:10px; align-items:center; border-top:1px solid var(--border); padding-top:10px;}
+  .cardRestLabel{font-size:11px; color:var(--muted); flex:0 0 auto;}
+  .cardRestBtn{flex:1; padding:7px 0; border-radius:8px; border:1px solid var(--border); background:var(--card2); color:var(--text); font-size:12px; font-weight:600;}
+  .cardRestBtn:active{opacity:.7;}
   .weightrow{display:flex; gap:8px; margin-top:10px;}
   .weightrow .weightInput{
     flex:1; padding:8px 10px; border-radius:8px; border:1px solid var(--border);
@@ -163,24 +169,25 @@
     background:var(--card2); color:var(--text); font-size:13.5px;
   }
 
-  /* 쉬는시간 타이머 */
+  /* 쉬는시간 타이머 - 화면 하단 고정 floating (nav 바로 위) */
   .restTimerWidget{
-    background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px;
-    transition:background .15s, border-color .15s;
+    position:fixed;
+    bottom:calc(72px + env(safe-area-inset-bottom, 0px));
+    left:16px; right:16px;
+    z-index:50;
+    display:none; /* 타이머 작동 중에만 flex로 바뀜 */
+    align-items:center; justify-content:space-between; gap:12px;
+    background:var(--accent); border-radius:14px; padding:12px 16px;
+    box-shadow:0 4px 24px rgba(0,0,0,.55);
+    transition:background .15s;
   }
-  .restTimerWidget.flash{background:var(--good); border-color:var(--good);}
-  .restTimerTitle{font-size:13.5px; font-weight:700; margin-bottom:8px; color:var(--accent);}
-  .restTimerRow{display:flex; gap:8px; margin-bottom:8px;}
-  .restTimerOptBtn{
-    flex:1; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--card2);
-    color:var(--text); font-weight:700; font-size:13.5px; min-height:36px;
-  }
-  .restTimerOptBtn:disabled{opacity:.5;}
-  .restTimerStatusRow{display:flex; align-items:center; justify-content:space-between; gap:8px;}
-  .restTimerDisplay{font-size:22px; font-weight:700; font-variant-numeric:tabular-nums;}
+  .restTimerWidget.active{ display:flex; }
+  .restTimerWidget.flash{ background:var(--accent2); }
+  .restTimerLabel{ font-size:13px; font-weight:700; color:#06201e; white-space:nowrap; }
+  .restTimerDisplay{ font-size:24px; font-weight:700; font-variant-numeric:tabular-nums; color:#06201e; flex:1; text-align:center; }
   .restTimerCancelBtn{
-    padding:8px 14px; border-radius:8px; border:1px solid var(--border); background:var(--card2);
-    color:#ff8a8a; font-weight:700; font-size:13px; min-height:36px;
+    padding:7px 13px; border-radius:8px; border:none; background:rgba(0,0,0,.18);
+    color:#06201e; font-weight:700; font-size:13px; white-space:nowrap;
   }
 
   /* 운동 시간 트래킹 */
@@ -301,16 +308,9 @@
 
   <section class="tabpanel" id="tab-counter">
     <div class="restTimerWidget" id="restTimerWidget">
-      <div class="restTimerTitle" id="restTimerTitle">⏳ 쉬는시간 타이머</div>
-      <div class="restTimerRow">
-        <button class="restTimerOptBtn" id="restTimer1Btn" onclick="startRestTimer(60)">1분</button>
-        <button class="restTimerOptBtn" id="restTimer2Btn" onclick="startRestTimer(120)">2분</button>
-        <button class="restTimerOptBtn" id="restTimer3Btn" onclick="startRestTimer(180)">3분</button>
-      </div>
-      <div class="restTimerStatusRow">
-        <div class="restTimerDisplay" id="restTimerDisplay">00:00</div>
-        <button class="restTimerCancelBtn" id="restTimerCancelBtn" onclick="cancelRestTimer()">취소</button>
-      </div>
+      <span class="restTimerLabel">⏳ 쉬는시간</span>
+      <div class="restTimerDisplay" id="restTimerDisplay">00:00</div>
+      <button class="restTimerCancelBtn" id="restTimerCancelBtn" onclick="cancelRestTimer()">취소</button>
     </div>
     <div class="workoutTimerWidget" id="workoutTimerWidget">
       <div class="workoutTimerTitle" id="workoutTimerTitle">⏱️ 운동 시간</div>
@@ -693,6 +693,7 @@ const STORAGE_KEY_OVERRIDES = "wt_overrides_v1";
 const STORAGE_KEY_DELETED = "wt_deleted_v1";
 const STORAGE_KEY_TODAY_DATE = "wt_today_date_v1";
 const STORAGE_KEY_WORKOUT_TIMER = "wt_workout_timer_v1";
+const STORAGE_KEY_EX_HISTORY = "wt_exHistory_v1"; // 운동별 마지막 기록 (per-exercise, not per-session)
 
 let currentCat = "등";
 let todayState = loadToday(); // { id: {checked:bool, sets:int, done:[bool,...]} }
@@ -716,6 +717,28 @@ function checkAndResetForNewDay(){
   const savedDate = localStorage.getItem(STORAGE_KEY_TODAY_DATE);
   const todayKey = todayDateKey();
   if(savedDate && savedDate !== todayKey){
+    // 날짜가 바뀔 때: 세트를 1개 이상 완료한 운동만 per-exercise 히스토리에 저장
+    try{
+      const prevRaw = JSON.parse(localStorage.getItem(STORAGE_KEY_TODAY) || "{}");
+      let exHistory = {};
+      try{ exHistory = JSON.parse(localStorage.getItem(STORAGE_KEY_EX_HISTORY) || "{}"); }catch(e){}
+      Object.keys(prevRaw).forEach(id=>{
+        const s = prevRaw[id];
+        // 체크돼있고, done 배열에 true가 하나라도 있을 때만 저장
+        if(s && s.checked && s.done && s.done.some(Boolean)){
+          // 완료된 세트의 reps/weights만 추출
+          const doneIdxs = (s.done || []).map((d,i)=>d?i:-1).filter(i=>i>=0);
+          exHistory[id] = {
+            date: savedDate,
+            sets: doneIdxs.length,
+            reps: doneIdxs.map(i=> (s.reps && s.reps[i]!=null) ? s.reps[i] : 10),
+            weights: doneIdxs.map(i=> (s.weights && s.weights[i]!=null && s.weights[i]!=="") ? s.weights[i] : ""),
+            unit: s.unit || "kg"
+          };
+        }
+      });
+      localStorage.setItem(STORAGE_KEY_EX_HISTORY, JSON.stringify(exHistory));
+    }catch(e){}
     todayState = {};
     localStorage.setItem(STORAGE_KEY_TODAY, JSON.stringify(todayState));
     didResetForNewDay = true;
@@ -918,10 +941,6 @@ function applyStaticLanguage(){
   document.getElementById("titleModalSaveBtn").textContent = u.titleModalSave;
   document.getElementById("titleModalClearBtn").textContent = u.titleModalClear;
   document.getElementById("titleModalCloseBtn").textContent = u.titleModalClose;
-  document.getElementById("restTimerTitle").textContent = u.restTimerTitle;
-  document.getElementById("restTimer1Btn").textContent = u.restTimer1;
-  document.getElementById("restTimer2Btn").textContent = u.restTimer2;
-  document.getElementById("restTimer3Btn").textContent = u.restTimer3;
   document.getElementById("restTimerCancelBtn").textContent = u.restTimerCancel;
   document.getElementById("workoutTimerTitle").textContent = u.workoutTimerTitle;
   document.getElementById("workoutTimerResetBtn").textContent = u.workoutTimerReset;
@@ -1121,6 +1140,47 @@ function addCustomExercise(){
 }
 
 /* ===================== 카운터 ===================== */
+function buildPrevHint(p){
+  if(!p) return "";
+  const isKo = currentLang === "ko";
+
+  // 날짜를 읽기 좋게 변환 (예: Jun 30 / 6월 30일)
+  let dateStr = p.date || "";
+  try{
+    const d = new Date(p.date + "T00:00:00");
+    dateStr = isKo
+      ? `${d.getMonth()+1}월 ${d.getDate()}일`
+      : d.toLocaleDateString("en-US", {month:"short", day:"numeric"});
+  }catch(e){}
+
+  // 세트/횟수 요약
+  const reps = (p.reps || []).slice(0, p.sets);
+  const weights = (p.weights || []).filter(w => w !== "" && w !== null && w !== undefined);
+  const unit = p.unit || "kg";
+
+  let setsReps = "";
+  if(reps.length){
+    const allSame = reps.every(r=>r===reps[0]);
+    setsReps = allSame
+      ? `${p.sets} sets × ${reps[0]}${isKo?"회":" reps"}`
+      : `${reps.join("/")}${isKo?"회":" reps"}`;
+  }
+
+  let weightStr = "";
+  if(weights.length){
+    const allSame = weights.every(w=>w===weights[0]);
+    weightStr = "@ " + (allSame ? weights[0] : weights.join("/")) + unit;
+  }
+
+  const detail = [setsReps, weightStr].filter(Boolean).join(" ");
+
+  const msg = isKo
+    ? `${dateStr}에 ${detail} 하셨어요 💪`
+    : `Last time on ${dateStr}${detail ? " — " + detail : ""} 💪`;
+
+  return `<div class="prevSessionHint">📋 ${msg}</div>`;
+}
+
 function renderCounter(){
   const list = document.getElementById("counterList");
   const u = t();
@@ -1138,12 +1198,16 @@ function renderCounter(){
   } else {
     document.getElementById("counterTapHint").textContent = u.counterTapHint;
   }
+  let prevSession = {};
+  try{ prevSession = JSON.parse(localStorage.getItem(STORAGE_KEY_EX_HISTORY) || "{}"); }catch(e){}
+
   entries.forEach(id=>{
     const st = todayState[id];
     syncDoneLength(st);
     const ex = findExerciseById(st.cat, id);
     const displayName = ex ? getDisplayName(ex) : st.name;
     const tipText = ex ? getDisplayTip(ex) : "";
+    const prevHtml = buildPrevHint(prevSession[id]);
     const card = document.createElement("div");
     card.className = "counter-card";
     const rowsHtml = st.done.map((d,i)=>{
@@ -1167,8 +1231,10 @@ function renderCounter(){
         <div class="actions">
           <button data-act="reset">↺</button>
           <button data-act="all">✅</button>
+          <button data-act="remove" title="${currentLang==="ko"?"목록에서 제거":"Remove"}">✕</button>
         </div>
       </div>
+      ${prevHtml}
       ${tipText ? `<div class="exTip">${linkifyText(tipText)}</div>` : ""}
       <div class="setRows">${rowsHtml}</div>
       <div class="unitRow">
@@ -1176,6 +1242,12 @@ function renderCounter(){
           <option value="kg" ${st.unit!=="lbs"?"selected":""}>kg</option>
           <option value="lbs" ${st.unit==="lbs"?"selected":""}>lbs</option>
         </select>
+      </div>
+      <div class="cardRestRow">
+        <span class="cardRestLabel">⏳</span>
+        <button class="cardRestBtn" data-act="rest1">${u.restTimer1}</button>
+        <button class="cardRestBtn" data-act="rest2">${u.restTimer2}</button>
+        <button class="cardRestBtn" data-act="rest3">${u.restTimer3}</button>
       </div>
     `;
     card.querySelectorAll('[data-act="toggleDone"]').forEach(btn=>{
@@ -1212,9 +1284,15 @@ function renderCounter(){
     card.querySelector('[data-act="all"]').onclick = ()=>{
       st.done = st.done.map(()=>true); saveToday(); renderCounter();
     };
+    card.querySelector('[data-act="remove"]').onclick = ()=>{
+      st.checked = false; saveToday(); renderCounter(); renderExerciseList();
+    };
     card.querySelector(".unitSelect").onchange = (e)=>{
       st.unit = e.target.value; saveToday(); renderCounter();
     };
+    card.querySelector('[data-act="rest1"]').onclick = ()=>startRestTimer(60);
+    card.querySelector('[data-act="rest2"]').onclick = ()=>startRestTimer(120);
+    card.querySelector('[data-act="rest3"]').onclick = ()=>startRestTimer(180);
     list.appendChild(card);
   });
   updateProgress();
@@ -2103,8 +2181,9 @@ function formatMMSS(totalSec){
 
 function startRestTimer(durationSec){
   clearInterval(restTimerInterval);
+  stopAlarmSound(); // 이미 울리고 있던 알람 중지
   restTimerEndAt = Date.now() + durationSec*1000;
-  setRestTimerButtonsDisabled(true);
+  document.getElementById("restTimerWidget").classList.add("active");
   updateRestTimerDisplay();
   restTimerInterval = setInterval(()=>{
     const remainingMs = restTimerEndAt - Date.now();
@@ -2129,40 +2208,57 @@ function cancelRestTimer(){
   clearInterval(restTimerInterval);
   restTimerInterval = null;
   restTimerEndAt = null;
+  stopAlarmSound();
   document.getElementById("restTimerDisplay").textContent = "00:00";
-  setRestTimerButtonsDisabled(false);
+  document.getElementById("restTimerWidget").classList.remove("active");
 }
 
-function setRestTimerButtonsDisabled(disabled){
-  ["restTimer1Btn","restTimer2Btn","restTimer3Btn"].forEach(id=>{
-    document.getElementById(id).disabled = disabled;
-  });
+function setRestTimerButtonsDisabled(disabled){ /* 카드 버튼 방식으로 전환 후 no-op */ }
+
+let _alarmCtx = null; // 알람 중지용 AudioContext 참조
+
+function stopAlarmSound(){
+  if(_alarmCtx){ try{ _alarmCtx.close(); }catch(e){} _alarmCtx = null; }
+  try{ if(navigator.vibrate) navigator.vibrate(0); }catch(e){} // 진동 즉시 중지
 }
 
 function onRestTimerComplete(){
-  setRestTimerButtonsDisabled(false);
   restTimerEndAt = null;
-  try{ if(navigator.vibrate) navigator.vibrate([200,100,200]); }catch(e){}
+  // 진동 패턴 (짧은 3번)
+  try{ if(navigator.vibrate) navigator.vibrate([300,120,300,120,400]); }catch(e){}
+  // 3연속 비프음 — AudioContext 저장해서 취소 버튼으로 중지 가능
   try{
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if(AudioCtx){
       const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.55);
-      osc.onended = ()=>{ try{ ctx.close(); }catch(e){} };
+      _alarmCtx = ctx;
+      function playBeep(freq, startTime, duration){
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.001, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.35, startTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + duration + 0.05);
+      }
+      const now = ctx.currentTime;
+      playBeep(880, now, 0.22);
+      playBeep(880, now + 0.32, 0.22);
+      playBeep(1108, now + 0.64, 0.38);
+      // 알람 끝나면 ctx 자동 해제
+      setTimeout(()=>{ if(_alarmCtx === ctx){ try{ ctx.close(); }catch(e){} _alarmCtx = null; } }, 2000);
     }
   }catch(e){}
   const widget = document.getElementById("restTimerWidget");
   widget.classList.add("flash");
-  setTimeout(()=>{ widget.classList.remove("flash"); }, 600);
+  // 플래시 후 배너 숨기기
+  setTimeout(()=>{
+    widget.classList.remove("flash");
+    widget.classList.remove("active");
+  }, 900);
   showToast(t().toastRestOver);
 }
 
@@ -2231,7 +2327,8 @@ function initWorkoutTimerUI(){
 const BACKUP_KEYS = [
   STORAGE_KEY_LANG, STORAGE_KEY_NOTE, STORAGE_KEY_TITLE, STORAGE_KEY_RUNS,
   STORAGE_KEY_TODAY, STORAGE_KEY_HISTORY, STORAGE_KEY_CUSTOM, STORAGE_KEY_OVERRIDES,
-  STORAGE_KEY_DELETED, STORAGE_KEY_TODAY_DATE, STORAGE_KEY_WORKOUT_TIMER
+  STORAGE_KEY_DELETED, STORAGE_KEY_TODAY_DATE, STORAGE_KEY_WORKOUT_TIMER,
+  STORAGE_KEY_EX_HISTORY
 ];
 
 function exportBackup(){
