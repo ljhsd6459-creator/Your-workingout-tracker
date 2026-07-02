@@ -826,22 +826,22 @@ function checkAndResetForNewDay(){
   const savedDate = localStorage.getItem(STORAGE_KEY_TODAY_DATE);
   const todayKey = todayDateKey();
   if(savedDate && savedDate !== todayKey){
-    // 날짜가 바뀔 때: 세트를 1개 이상 완료한 운동만 per-exercise 히스토리에 저장
+    // 날짜가 바뀔 때: 체크된 운동은 세트 완료 여부와 관계없이 reps/weight 그대로 저장
     try{
       const prevRaw = JSON.parse(localStorage.getItem(STORAGE_KEY_TODAY) || "{}");
       let exHistory = {};
       try{ exHistory = JSON.parse(localStorage.getItem(STORAGE_KEY_EX_HISTORY) || "{}"); }catch(e){}
       Object.keys(prevRaw).forEach(id=>{
         const s = prevRaw[id];
-        // 체크돼있고, done 배열에 true가 하나라도 있을 때만 저장
-        if(s && s.checked && s.done && s.done.some(Boolean)){
-          // 완료된 세트의 reps/weights만 추출
+        if(s && s.checked && s.sets > 0){
+          // 완료된 세트 우선, 없으면 설정된 세트 전체 기록
           const doneIdxs = (s.done || []).map((d,i)=>d?i:-1).filter(i=>i>=0);
+          const idxs = doneIdxs.length > 0 ? doneIdxs : [...Array(s.sets).keys()];
           exHistory[id] = {
             date: savedDate,
-            sets: doneIdxs.length,
-            reps: doneIdxs.map(i=> (s.reps && s.reps[i]!=null) ? s.reps[i] : 10),
-            weights: doneIdxs.map(i=> (s.weights && s.weights[i]!=null && s.weights[i]!=="") ? s.weights[i] : ""),
+            sets: idxs.length,
+            reps: idxs.map(i=> (s.reps && s.reps[i]!=null) ? s.reps[i] : 10),
+            weights: idxs.map(i=> (s.weights && s.weights[i]!=null && s.weights[i]!=="") ? s.weights[i] : ""),
             unit: s.unit || "kg"
           };
         }
