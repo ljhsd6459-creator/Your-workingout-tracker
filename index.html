@@ -183,6 +183,19 @@
   }
   .restTimerWidget.active{ display:flex; }
   .restTimerWidget.flash{ background:var(--accent2); }
+  /* 화면 전체 플래시 오버레이 */
+  #screenFlashOverlay{
+    display:none; position:fixed; inset:0; z-index:9999;
+    pointer-events:none; background:rgba(74,222,128,0.55);
+  }
+  @keyframes screenFlashAnim{
+    0%,100%{ opacity:0; }
+    40%,60%{ opacity:1; }
+  }
+  #screenFlashOverlay.flashing{
+    display:block;
+    animation:screenFlashAnim 0.45s ease-in-out 5;
+  }
   .restTimerLabel{ font-size:13px; font-weight:700; color:#06201e; white-space:nowrap; }
   .restTimerDisplay{ font-size:24px; font-weight:700; font-variant-numeric:tabular-nums; color:#06201e; flex:1; text-align:center; }
   .restTimerCancelBtn{
@@ -469,6 +482,7 @@
     <button class="modalClose" id="feedbackCloseBtn" onclick="closeFeedback()">닫기</button>
   </div>
 </div>
+<div id="screenFlashOverlay"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -826,28 +840,7 @@ function checkAndResetForNewDay(){
   const savedDate = localStorage.getItem(STORAGE_KEY_TODAY_DATE);
   const todayKey = todayDateKey();
   if(savedDate && savedDate !== todayKey){
-    // 날짜가 바뀔 때: 체크된 운동은 세트 완료 여부와 관계없이 reps/weight 그대로 저장
-    try{
-      const prevRaw = JSON.parse(localStorage.getItem(STORAGE_KEY_TODAY) || "{}");
-      let exHistory = {};
-      try{ exHistory = JSON.parse(localStorage.getItem(STORAGE_KEY_EX_HISTORY) || "{}"); }catch(e){}
-      Object.keys(prevRaw).forEach(id=>{
-        const s = prevRaw[id];
-        if(s && s.checked && s.sets > 0){
-          // 완료된 세트 우선, 없으면 설정된 세트 전체 기록
-          const doneIdxs = (s.done || []).map((d,i)=>d?i:-1).filter(i=>i>=0);
-          const idxs = doneIdxs.length > 0 ? doneIdxs : [...Array(s.sets).keys()];
-          exHistory[id] = {
-            date: savedDate,
-            sets: idxs.length,
-            reps: idxs.map(i=> (s.reps && s.reps[i]!=null) ? s.reps[i] : 10),
-            weights: idxs.map(i=> (s.weights && s.weights[i]!=null && s.weights[i]!=="") ? s.weights[i] : ""),
-            unit: s.unit || "kg"
-          };
-        }
-      });
-      localStorage.setItem(STORAGE_KEY_EX_HISTORY, JSON.stringify(exHistory));
-    }catch(e){}
+    // 날짜가 바뀌면 오늘 기록 초기화 (exHistory는 일지 저장 시점에만 갱신)
     todayState = {};
     localStorage.setItem(STORAGE_KEY_TODAY, JSON.stringify(todayState));
     didResetForNewDay = true;
@@ -1511,6 +1504,27 @@ function copyJournal(){
 function saveJournalToHistory(){
   const text = document.getElementById("journalOutput").value;
   if(!text.trim()){ showToast(t().toastNoJournal); return; }
+  // 일지 저장 시점에 운동별 이전 기록 갱신
+  try{
+    const todayRaw = JSON.parse(localStorage.getItem(STORAGE_KEY_TODAY) || "{}");
+    let exHistory = {};
+    try{ exHistory = JSON.parse(localStorage.getItem(STORAGE_KEY_EX_HISTORY) || "{}"); }catch(e){}
+    Object.keys(todayRaw).forEach(id=>{
+      const s = todayRaw[id];
+      if(s && s.checked && s.sets > 0){
+        const doneIdxs = (s.done || []).map((d,i)=>d?i:-1).filter(i=>i>=0);
+        const idxs = doneIdxs.length > 0 ? doneIdxs : [...Array(s.sets).keys()];
+        exHistory[id] = {
+          date: todayDateKey(),
+          sets: idxs.length,
+          reps: idxs.map(i=> (s.reps && s.reps[i]!=null) ? s.reps[i] : 10),
+          weights: idxs.map(i=> (s.weights && s.weights[i]!=null && s.weights[i]!=="") ? s.weights[i] : ""),
+          unit: s.unit || "kg"
+        };
+      }
+    });
+    localStorage.setItem(STORAGE_KEY_EX_HISTORY, JSON.stringify(exHistory));
+  }catch(e){}
   const history = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY) || "[]");
   const dateKey = todayDateKey();
   history.unshift({date:dateKey, text});
@@ -2350,6 +2364,7 @@ function formatMMSS(totalSec){
 }
 
 function startRestTimer(durationSec){
+  requestNotificationPermission(); // 첫 타이머 시작 시 알림 권한 요청
   clearInterval(restTimerInterval);
   stopAlarmSound(); // 이미 울리고 있던 알람 중지
   restTimerEndAt = Date.now() + durationSec*1000;
@@ -2392,8 +2407,43 @@ function stopAlarmSound(){
   try{ if(navigator.vibrate) navigator.vibrate(0); }catch(e){} // 진동 즉시 중지
 }
 
+function flashScreen(){
+  const overlay = document.getElementById("screenFlashOverlay");
+  if(!overlay) return;
+  overlay.classList.remove("flashing");
+  void overlay.offsetWidth; // reflow 강제
+  overlay.classList.add("flashing");
+  setTimeout(()=>{ overlay.classList.remove("flashing"); }, 2300);
+}
+
+function sendTimerNotification(){
+  try{
+    if(!("Notification" in window)) return;
+    if(Notification.permission === "granted"){
+      new Notification("⏰ 쉬는 시간 완료!", {
+        body: "다음 세트 시작할 시간이에요 💪",
+        tag: "rest-timer",
+        renotify: true,
+        silent: false
+      });
+    }
+  }catch(e){}
+}
+
+function requestNotificationPermission(){
+  try{
+    if("Notification" in window && Notification.permission === "default"){
+      Notification.requestPermission();
+    }
+  }catch(e){}
+}
+
 function onRestTimerComplete(){
   restTimerEndAt = null;
+  // 화면 전체 플래시 (5회 반짝임)
+  flashScreen();
+  // 시스템 알림 (백그라운드에서도 표시)
+  sendTimerNotification();
   // 진동 패턴 (짧은 3번)
   try{ if(navigator.vibrate) navigator.vibrate([300,120,300,120,400]); }catch(e){}
   // 3연속 비프음 — AudioContext 저장해서 취소 버튼으로 중지 가능
