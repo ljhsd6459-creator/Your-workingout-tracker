@@ -196,6 +196,25 @@
     display:block;
     animation:screenFlashAnim 0.45s ease-in-out 5;
   }
+  /* 컨디션 선택기 */
+  .conditionBox{
+    background:var(--card); border-radius:12px; padding:10px 14px 8px;
+    margin-bottom:10px; border:1px solid var(--border);
+  }
+  .conditionLabel{ font-size:11px; color:var(--muted); margin-bottom:6px; letter-spacing:.5px; }
+  .conditionBtns{ display:flex; justify-content:space-around; }
+  .condBtn{
+    width:46px; height:42px; border-radius:10px; border:2px solid transparent;
+    background:var(--card2); font-size:22px; cursor:pointer; transition:all .15s;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .condBtn.selected{ border-color:var(--accent); background:rgba(74,222,128,.18); transform:scale(1.12); }
+  /* 볼륨 배지 */
+  .volumeBadge{
+    display:inline-block; font-size:11px; color:var(--accent);
+    background:rgba(74,222,128,.12); border-radius:6px;
+    padding:2px 7px; margin-left:6px; font-weight:700; vertical-align:middle;
+  }
   .restTimerLabel{ font-size:13px; font-weight:700; color:#06201e; white-space:nowrap; }
   .restTimerDisplay{ font-size:24px; font-weight:700; font-variant-numeric:tabular-nums; color:#06201e; flex:1; text-align:center; }
   .restTimerCancelBtn{
@@ -300,6 +319,18 @@
 
 <main>
   <section class="tabpanel active" id="tab-select">
+    <!-- 컨디션 체크 -->
+    <div class="conditionBox" id="conditionBox">
+      <div class="conditionLabel" id="conditionLabel">오늘 컨디션</div>
+      <div class="conditionBtns">
+        <button class="condBtn" data-val="1" onclick="setCondition(1)">😫</button>
+        <button class="condBtn" data-val="2" onclick="setCondition(2)">😔</button>
+        <button class="condBtn" data-val="3" onclick="setCondition(3)">😐</button>
+        <button class="condBtn" data-val="4" onclick="setCondition(4)">😊</button>
+        <button class="condBtn" data-val="5" onclick="setCondition(5)">💪</button>
+      </div>
+      <svg id="conditionGraph" width="100%" height="36" style="margin-top:6px; display:block;"></svg>
+    </div>
     <div class="catbar" id="catbar"></div>
     <div class="selectGuideBanner" id="selectGuideBanner" style="display:none;">
       <div class="selectGuideMsg" id="selectGuideMsgText"></div>
@@ -816,6 +847,8 @@ const STORAGE_KEY_DELETED = "wt_deleted_v1";
 const STORAGE_KEY_TODAY_DATE = "wt_today_date_v1";
 const STORAGE_KEY_WORKOUT_TIMER = "wt_workout_timer_v1";
 const STORAGE_KEY_EX_HISTORY = "wt_exHistory_v1"; // 운동별 마지막 기록 (per-exercise, not per-session)
+const STORAGE_KEY_VOLUME    = "wt_volume_v1";    // 날짜별 볼륨·운동시간 기록
+const STORAGE_KEY_CONDITION = "wt_condition_v1"; // 날짜별 컨디션 (1~5)
 const STORAGE_KEY_BUILTIN_SNAPSHOT = "wt_builtin_snapshot_v1"; // 내장 운동 스냅샷 (export 복원용)
 
 let currentCat = "등";
@@ -1524,6 +1557,26 @@ function saveJournalToHistory(){
       }
     });
     localStorage.setItem(STORAGE_KEY_EX_HISTORY, JSON.stringify(exHistory));
+    // 볼륨 계산 (무게 × 횟수 × 세트) 및 운동 시간 기록
+    try{
+      let totalVolume = 0;
+      Object.keys(todayRaw).forEach(id=>{
+        const s = todayRaw[id];
+        if(s && s.checked && s.sets > 0){
+          const doneIdxs = (s.done||[]).map((d,i)=>d?i:-1).filter(i=>i>=0);
+          const idxs = doneIdxs.length>0 ? doneIdxs : [...Array(s.sets).keys()];
+          idxs.forEach(i=>{
+            const w = parseFloat((s.weights&&s.weights[i]) || 0) || 0;
+            const r = parseInt((s.reps&&s.reps[i]) || 10) || 10;
+            totalVolume += w * r;
+          });
+        }
+      });
+      const workoutMs = (typeof currentWorkoutElapsedMs==="function") ? currentWorkoutElapsedMs() : 0;
+      const volData = JSON.parse(localStorage.getItem(STORAGE_KEY_VOLUME)||"{}");
+      volData[todayDateKey()] = { volume: Math.round(totalVolume), workoutMs };
+      localStorage.setItem(STORAGE_KEY_VOLUME, JSON.stringify(volData));
+    }catch(e){}
   }catch(e){}
   const history = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY) || "[]");
   const dateKey = todayDateKey();
@@ -2368,6 +2421,13 @@ function startRestTimer(durationSec){
   clearInterval(restTimerInterval);
   stopAlarmSound(); // 이미 울리고 있던 알람 중지
   restTimerEndAt = Date.now() + durationSec*1000;
+  // 서비스워커에 종료 시각 전달 → 백그라운드에서도 알림 가능
+  try{
+    if(_swReg){
+      const sw = _swReg.active || _swReg.installing || _swReg.waiting;
+      if(sw) sw.postMessage({ type:'SET_TIMER', endAt: restTimerEndAt });
+    }
+  }catch(e){}
   document.getElementById("restTimerWidget").classList.add("active");
   updateRestTimerDisplay();
   restTimerInterval = setInterval(()=>{
@@ -2394,6 +2454,13 @@ function cancelRestTimer(){
   restTimerInterval = null;
   restTimerEndAt = null;
   stopAlarmSound();
+  // 서비스워커 타이머도 취소
+  try{
+    if(_swReg){
+      const sw = _swReg.active || _swReg.installing || _swReg.waiting;
+      if(sw) sw.postMessage({ type:'CANCEL_TIMER' });
+    }
+  }catch(e){}
   document.getElementById("restTimerDisplay").textContent = "00:00";
   document.getElementById("restTimerWidget").classList.remove("active");
 }
@@ -2548,8 +2615,86 @@ const BACKUP_KEYS = [
   STORAGE_KEY_LANG, STORAGE_KEY_NOTE, STORAGE_KEY_TITLE, STORAGE_KEY_RUNS,
   STORAGE_KEY_TODAY, STORAGE_KEY_HISTORY, STORAGE_KEY_CUSTOM, STORAGE_KEY_OVERRIDES,
   STORAGE_KEY_DELETED, STORAGE_KEY_TODAY_DATE, STORAGE_KEY_WORKOUT_TIMER,
-  STORAGE_KEY_EX_HISTORY, STORAGE_KEY_BUILTIN_SNAPSHOT
+  STORAGE_KEY_EX_HISTORY, STORAGE_KEY_BUILTIN_SNAPSHOT,
+  STORAGE_KEY_VOLUME, STORAGE_KEY_CONDITION
 ];
+
+/* ===================== 컨디션 트래커 ===================== */
+const COND_EMOJI = ["","😫","😔","😐","😊","💪"];
+const COND_LABEL = ["","최악","별로","보통","좋음","최고"];
+
+function setCondition(val){
+  const today = todayDateKey();
+  const cond = JSON.parse(localStorage.getItem(STORAGE_KEY_CONDITION)||"{}");
+  cond[today] = val;
+  localStorage.setItem(STORAGE_KEY_CONDITION, JSON.stringify(cond));
+  renderConditionSelector();
+}
+
+function renderConditionSelector(){
+  const today = todayDateKey();
+  const cond  = JSON.parse(localStorage.getItem(STORAGE_KEY_CONDITION)||"{}");
+  const cur   = cond[today] || 0;
+  document.querySelectorAll(".condBtn").forEach(btn=>{
+    btn.classList.toggle("selected", parseInt(btn.dataset.val)===cur);
+  });
+  renderConditionGraph();
+}
+
+function renderConditionGraph(){
+  const svg   = document.getElementById("conditionGraph");
+  if(!svg) return;
+  const cond  = JSON.parse(localStorage.getItem(STORAGE_KEY_CONDITION)||"{}");
+  // 최근 14일
+  const days  = [];
+  const now   = new Date();
+  for(let i=13;i>=0;i--){
+    const d = new Date(now); d.setDate(d.getDate()-i);
+    const k = d.toISOString().slice(0,10);
+    days.push({ key:k, val: cond[k]||0 });
+  }
+  const hasAny = days.some(d=>d.val>0);
+  if(!hasAny){ svg.innerHTML=""; return; }
+  const W=svg.getBoundingClientRect().width||280, H=36;
+  const padL=6, padR=6, padT=4, padB=4;
+  const n=days.length;
+  const xOf=i=>padL+(i/(n-1))*(W-padL-padR);
+  const yOf=v=>H-padB-(v/5)*(H-padT-padB);
+  // 선
+  let pathD="";
+  days.forEach((d,i)=>{
+    if(d.val===0) return;
+    const x=xOf(i), y=yOf(d.val);
+    pathD+=pathD?"":""
+    if(!pathD) pathD=`M${x},${y}`;
+    else pathD+=` L${x},${y}`;
+  });
+  // 점 + 선 SVG
+  let dots="";
+  days.forEach((d,i)=>{
+    if(d.val===0) return;
+    dots+=`<circle cx="${xOf(i)}" cy="${yOf(d.val)}" r="3.5" fill="var(--accent)" opacity=".9"/>`;
+  });
+  // 오늘 표시
+  const todayIdx=days.findIndex(d=>d.key===todayDateKey());
+  if(todayIdx>=0 && days[todayIdx].val>0){
+    dots+=`<circle cx="${xOf(todayIdx)}" cy="${yOf(days[todayIdx].val)}" r="5.5" fill="none" stroke="var(--accent)" stroke-width="2"/>`;
+  }
+  svg.innerHTML=
+    `<path d="${pathD}" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity=".6"/>`
+    +dots;
+}
+
+/* ===================== 서비스워커 (백그라운드 타이머 알림) ===================== */
+let _swReg = null;
+
+async function registerSW(){
+  if(!("serviceWorker" in navigator)) return;
+  try{
+    _swReg = await navigator.serviceWorker.register("/gymbuddy-sw.js");
+  }catch(e){}
+}
+registerSW();
 
 function exportBackup(){
   try{
@@ -2643,6 +2788,7 @@ document.getElementById("runDateInput").value = todayDateKey();
 renderRunHistory();
 renderRunCalendar();
 initWorkoutTimerUI();
+renderConditionSelector();
 if(didResetForNewDay){ showToast(t().toastNewDay); }
 </script>
 <script data-goatcounter="https://ljhsd6459.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
