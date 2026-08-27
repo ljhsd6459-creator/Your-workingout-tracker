@@ -298,6 +298,23 @@
     padding:10px 18px; border-radius:20px; font-size:13px; font-weight:700; z-index:60; display:none;
   }
   a.condlink{color:var(--accent);}
+  /* 검색창 */
+  .searchWrap{ position:relative; margin-bottom:8px; }
+  .searchWrap input{
+    width:100%; padding:9px 12px 9px 34px; border-radius:20px;
+    border:1px solid var(--border); background:var(--card2); color:var(--text);
+    font-size:14px; outline:none;
+  }
+  .searchWrap input:focus{ border-color:var(--accent); }
+  .searchIcon{ position:absolute; left:11px; top:50%; transform:translateY(-50%); font-size:14px; pointer-events:none; }
+  /* 세트 삭제 버튼 */
+  .setDelBtn{
+    width:26px; height:26px; border-radius:6px; border:1px solid #5a2e3a;
+    background:#2a1020; color:#ff8a8a; font-size:16px; flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center; line-height:1;
+  }
+  /* reps 탭하면 입력 */
+  .repsValue{ cursor:pointer; text-decoration:underline dotted var(--muted); }
 </style>
 </head>
 <body>
@@ -330,6 +347,10 @@
         <button class="condBtn" data-val="5" onclick="setCondition(5)">💪</button>
       </div>
       <svg id="conditionGraph" width="100%" height="36" style="margin-top:6px; display:block;"></svg>
+    </div>
+    <div class="searchWrap">
+      <span class="searchIcon">🔍</span>
+      <input type="search" id="exSearchInput" placeholder="운동 검색..." oninput="onExSearch()" onsearch="onExSearch()">
     </div>
     <div class="catbar" id="catbar"></div>
     <div class="selectGuideBanner" id="selectGuideBanner" style="display:none;">
@@ -1195,26 +1216,54 @@ function renderCatbar(){
   });
 }
 
+let currentSearchQuery = "";
+function onExSearch(){
+  currentSearchQuery = (document.getElementById("exSearchInput").value||"").trim().toLowerCase();
+  renderExerciseList();
+}
+
 function renderExerciseList(){
   const list = document.getElementById("exerciseList");
   list.innerHTML = "";
   const u = t();
-  exercisesData[currentCat].forEach(ex=>{
+  const q = currentSearchQuery;
+
+  // 검색 모드: 모든 카테고리에서 매칭되는 운동 수집
+  let pool = [];
+  if(q){
+    Object.entries(exercisesData).forEach(([cat, exes])=>{
+      exes.forEach(ex=>{
+        const nm = getDisplayName(ex).toLowerCase();
+        const tp = getDisplayTip(ex).toLowerCase();
+        if(nm.includes(q) || tp.includes(q)) pool.push({ex, cat});
+      });
+    });
+  } else {
+    exercisesData[currentCat].forEach(ex=> pool.push({ex, cat:currentCat}));
+  }
+
+  if(q && pool.length === 0){
+    list.innerHTML = `<div class="empty">검색 결과 없음</div>`;
+    return;
+  }
+
+  pool.forEach(({ex, cat})=>{
     const id = ex.id;
-    if(!todayState[id]) todayState[id] = {checked:false, sets:3, cat:currentCat, name:ex.name, done:[false,false,false], weight:"", unit:"kg"};
+    if(!todayState[id]) todayState[id] = {checked:false, sets:3, cat, name:ex.name, done:[false,false,false], weight:"", unit:"kg"};
     if(todayState[id].weight===undefined) todayState[id].weight = "";
     if(todayState[id].unit===undefined) todayState[id].unit = "kg";
     if(!todayState[id].reps) todayState[id].reps = Array.from({length:todayState[id].sets}, ()=>10);
     if(!todayState[id].weights) todayState[id].weights = Array.from({length:todayState[id].sets}, ()=> todayState[id].weight || "");
     const st = todayState[id];
-    st.name = ex.name; // 표시는 getDisplayName으로, 저장은 항상 기본 이름 기준
+    st.name = ex.name;
     const tipText = getDisplayTip(ex);
+    const catLabel = q ? `<span style="font-size:10px;color:var(--muted);margin-left:4px;">[${getDisplayCat(cat)}]</span>` : "";
     const row = document.createElement("div");
     row.className = "exrow" + (st.checked ? " selected" : "");
     row.innerHTML = `
       <div class="check">${st.checked ? "✓" : ""}</div>
       <div class="nameWrap">
-        <div class="name">${getDisplayName(ex)}</div>
+        <div class="name">${getDisplayName(ex)}${catLabel}</div>
         ${tipText ? `<div class="exTip">${linkifyText(tipText)}</div>` : ""}
       </div>
       <div class="setstep">
@@ -1233,7 +1282,7 @@ function renderExerciseList(){
     });
     row.querySelector('[data-act="dec"]').onclick = (e)=>{ e.stopPropagation(); st.sets = Math.max(2, st.sets-1); syncDoneLength(st); saveToday(); renderExerciseList(); };
     row.querySelector('[data-act="inc"]').onclick = (e)=>{ e.stopPropagation(); st.sets = Math.min(5, st.sets+1); syncDoneLength(st); saveToday(); renderExerciseList(); };
-    row.querySelector(".info").onclick = (e)=>{ e.stopPropagation(); openEditModal(currentCat, ex); };
+    row.querySelector(".info").onclick = (e)=>{ e.stopPropagation(); openEditModal(cat, ex); };
     list.appendChild(row);
   });
 }
@@ -1372,12 +1421,11 @@ function renderCounter(){
       <div class="setRow" data-i="${i}">
         <button class="setDoneBtn ${d?'done':''}" data-act="toggleDone" data-i="${i}">${d?'✓':i+1}</button>
         <div class="repsStepper">
-          <button class="repsMinusBtn" data-act="repsMinus" data-i="${i}">−</button>
-          <span class="repsValue" data-i="${i}">${reps}</span>
+          <span class="repsValue tapToEdit" data-i="${i}" title="탭해서 수정">${reps}</span>
           <span class="repsUnit">${u.repsUnit}</span>
-          <button class="repsPlusBtn" data-act="repsPlus" data-i="${i}">+</button>
         </div>
         <input type="number" inputmode="decimal" step="0.5" class="setWeightInput" data-i="${i}" placeholder="${st.unit}" aria-label="${u.weightPh} (${st.unit})" value="${weightVal}">
+        ${st.sets > 1 ? `<button class="setDelBtn" data-act="delSet" data-i="${i}" title="이 세트 삭제">−</button>` : ''}
       </div>`;
     }).join("");
     card.innerHTML = `
@@ -1412,17 +1460,33 @@ function renderCounter(){
         saveToday(); renderCounter();
       };
     });
-    card.querySelectorAll('[data-act="repsMinus"]').forEach(btn=>{
-      btn.onclick = ()=>{
-        const i = +btn.dataset.i;
-        st.reps[i] = Math.max(1, (st.reps[i]||1) - 1);
-        saveToday(); renderCounter();
+    // reps 탭해서 직접 입력
+    card.querySelectorAll('.repsValue.tapToEdit').forEach(span=>{
+      span.onclick = ()=>{
+        const i = +span.dataset.i;
+        const inp = document.createElement("input");
+        inp.type = "number"; inp.inputMode = "numeric";
+        inp.value = st.reps[i] || 10; inp.min = 1; inp.max = 99;
+        inp.style.cssText = "width:50px;text-align:center;font-size:14px;font-weight:700;border-radius:6px;border:2px solid var(--accent);background:var(--card2);color:var(--text);padding:3px 4px;";
+        span.replaceWith(inp);
+        inp.focus(); inp.select();
+        const finish = ()=>{
+          st.reps[i] = Math.max(1, Math.min(99, parseInt(inp.value)||1));
+          saveToday(); renderCounter();
+        };
+        inp.onblur = finish;
+        inp.onkeydown = (e)=>{ if(e.key==="Enter") inp.blur(); };
       };
     });
-    card.querySelectorAll('[data-act="repsPlus"]').forEach(btn=>{
+    // 세트 삭제 버튼
+    card.querySelectorAll('[data-act="delSet"]').forEach(btn=>{
       btn.onclick = ()=>{
         const i = +btn.dataset.i;
-        st.reps[i] = Math.min(20, (st.reps[i]||1) + 1);
+        if(st.sets <= 1) return;
+        st.done.splice(i, 1);
+        st.reps.splice(i, 1);
+        st.weights.splice(i, 1);
+        st.sets--;
         saveToday(); renderCounter();
       };
     });
@@ -1445,9 +1509,9 @@ function renderCounter(){
     card.querySelector(".unitSelect").onchange = (e)=>{
       st.unit = e.target.value; saveToday(); renderCounter();
     };
-    card.querySelector('[data-act="rest1"]').onclick = ()=>startRestTimer(60);
-    card.querySelector('[data-act="rest2"]').onclick = ()=>startRestTimer(120);
-    card.querySelector('[data-act="rest3"]').onclick = ()=>startRestTimer(180);
+    card.querySelector('[data-act="rest1"]').onclick = ()=>startRestTimer(60, id, displayName);
+    card.querySelector('[data-act="rest2"]').onclick = ()=>startRestTimer(120, id, displayName);
+    card.querySelector('[data-act="rest3"]').onclick = ()=>startRestTimer(180, id, displayName);
     list.appendChild(card);
   });
   updateProgress();
@@ -1557,24 +1621,41 @@ function saveJournalToHistory(){
       }
     });
     localStorage.setItem(STORAGE_KEY_EX_HISTORY, JSON.stringify(exHistory));
-    // 볼륨 계산 (무게 × 횟수 × 세트) 및 운동 시간 기록
+    // 볼륨 계산 (무게 × 횟수 × 세트) + 운동별 상세 + 쉬는시간 기록
     try{
       let totalVolume = 0;
+      const byExercise = {};
       Object.keys(todayRaw).forEach(id=>{
         const s = todayRaw[id];
         if(s && s.checked && s.sets > 0){
           const doneIdxs = (s.done||[]).map((d,i)=>d?i:-1).filter(i=>i>=0);
           const idxs = doneIdxs.length>0 ? doneIdxs : [...Array(s.sets).keys()];
+          let exVol = 0;
           idxs.forEach(i=>{
             const w = parseFloat((s.weights&&s.weights[i]) || 0) || 0;
             const r = parseInt((s.reps&&s.reps[i]) || 10) || 10;
-            totalVolume += w * r;
+            exVol += w * r;
           });
+          totalVolume += exVol;
+          byExercise[id] = {
+            name: s.name,
+            sets: idxs.length,
+            volume: Math.round(exVol),
+            reps: idxs.map(i=> (s.reps&&s.reps[i]!=null) ? s.reps[i] : 10),
+            weights: idxs.map(i=> (s.weights&&s.weights[i]!=null&&s.weights[i]!=="") ? s.weights[i] : ""),
+            unit: s.unit || "kg"
+          };
         }
+      });
+      // 쉬는시간 운동별 집계
+      const restByEx = {};
+      todayRestLog.forEach(({exId, name, sec})=>{
+        if(!restByEx[exId]) restByEx[exId] = {name, rests:[]};
+        restByEx[exId].rests.push(sec);
       });
       const workoutMs = (typeof currentWorkoutElapsedMs==="function") ? currentWorkoutElapsedMs() : 0;
       const volData = JSON.parse(localStorage.getItem(STORAGE_KEY_VOLUME)||"{}");
-      volData[todayDateKey()] = { volume: Math.round(totalVolume), workoutMs };
+      volData[todayDateKey()] = { volume: Math.round(totalVolume), workoutMs, byExercise, restByEx };
       localStorage.setItem(STORAGE_KEY_VOLUME, JSON.stringify(volData));
     }catch(e){}
   }catch(e){}
@@ -2416,7 +2497,11 @@ function formatMMSS(totalSec){
   return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
 }
 
-function startRestTimer(durationSec){
+let todayRestLog = []; // [{exId, name, sec}] — 오늘 쉬는시간 기록
+
+function startRestTimer(durationSec, exId, exName){
+  // 어떤 운동의 쉬는시간인지 기록
+  if(exId){ todayRestLog.push({exId, name: exName||exId, sec: durationSec}); }
   requestNotificationPermission(); // 첫 타이머 시작 시 알림 권한 요청
   clearInterval(restTimerInterval);
   stopAlarmSound(); // 이미 울리고 있던 알람 중지
