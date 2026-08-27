@@ -315,11 +315,20 @@
   .condSkipBtn{ background:var(--card2); color:var(--muted); border:1px solid var(--border) !important; }
   .condConfirmBtn{ background:var(--accent); color:#06201e; }
   /* 트래킹 모달 항목 */
-  .condEntry{ display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--border); }
-  .condEntryTime{ font-size:12px; color:var(--muted); min-width:36px; }
-  .condEntryEmoji{ font-size:20px; }
-  .condEntryLabel{ font-size:13px; }
-  .condTrackerAddTitle{ font-size:12px; color:var(--muted); margin:14px 0 8px; letter-spacing:.3px; }
+  .condEntryCard{
+    display:flex; align-items:center; gap:12px;
+    background:var(--card2); border-radius:10px; padding:10px 14px; margin-bottom:8px;
+  }
+  .condEntryEmoji{ font-size:26px; flex:0 0 auto; }
+  .condEntryInfo{ flex:1; }
+  .condEntryLabel{ font-size:15px; font-weight:700; }
+  .condEntryTime{ font-size:11px; color:var(--muted); margin-top:2px; }
+  .condNoEntry{
+    text-align:center; padding:14px 0; color:var(--muted); font-size:13px;
+  }
+  .condTrackerDivider{ font-size:11px; color:var(--muted); margin:14px 0 8px; letter-spacing:.3px; text-transform:uppercase; }
+  .condTrackerGraphWrap{ background:var(--card2); border-radius:10px; padding:10px 12px 8px; margin:12px 0 10px; }
+  .condTrackerGraphTitle{ font-size:11px; color:var(--muted); margin-bottom:6px; }
   /* 검색창 */
   .searchWrap{ position:relative; margin-bottom:8px; }
   .searchWrap input{
@@ -367,7 +376,11 @@
   <div class="modal" style="max-width:360px;">
     <h4>📊 컨디션 트래킹</h4>
     <div id="condTrackerEntries"></div>
-    <div class="condTrackerAddTitle">새 컨디션 추가</div>
+    <div class="condTrackerGraphWrap">
+      <div class="condTrackerGraphTitle">최근 14일</div>
+      <svg id="condTrackerGraph" width="100%" height="46" style="display:block;"></svg>
+    </div>
+    <div class="condTrackerDivider">+ 지금 컨디션 추가</div>
     <div class="conditionBtns" id="condTrackerBtns">
       <button class="condBtn" data-val="1" onclick="selectTrackerCond(1)">😫</button>
       <button class="condBtn" data-val="2" onclick="selectTrackerCond(2)">😔</button>
@@ -376,9 +389,8 @@
       <button class="condBtn" data-val="5" onclick="selectTrackerCond(5)">💪</button>
     </div>
     <div class="condSelectedLabel" id="condTrackerLabel"></div>
-    <button id="condTrackerSaveBtn" onclick="saveTrackerCond()" style="width:100%;margin-top:10px;padding:10px;border-radius:8px;border:none;background:var(--accent);color:#06201e;font-weight:700;display:none;">기록 저장</button>
-    <svg id="condTrackerGraph" width="100%" height="50" style="margin:12px 0 6px; display:block;"></svg>
-    <button onclick="closeCondTracker()" class="modalClose" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-weight:700;">닫기</button>
+    <button id="condTrackerSaveBtn" onclick="saveTrackerCond()" style="width:100%;margin-top:10px;padding:10px;border-radius:8px;border:none;background:var(--accent);color:#06201e;font-weight:700;display:none;">지금 시간으로 저장</button>
+    <button onclick="closeCondTracker()" class="modalClose" style="width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-weight:700;">닫기</button>
   </div>
 </div>
 
@@ -2835,21 +2847,31 @@ function renderCondTracker(){
   const today = todayDateKey();
   const entries = getCondEntries(today);
   const el = document.getElementById("condTrackerEntries");
-  el.innerHTML = entries.length === 0
-    ? `<div style="font-size:13px;color:var(--muted);padding:8px 0 4px;">오늘 기록 없음</div>`
-    : entries.map(e=>
-        `<div class="condEntry">
-          <span class="condEntryTime">${e.time||"--:--"}</span>
-          <span class="condEntryEmoji">${COND_EMOJI[e.val]||""}</span>
-          <span class="condEntryLabel">${COND_LABEL[e.val]||""}</span>
-        </div>`
-      ).join("");
+
+  if(entries.length === 0){
+    el.innerHTML = `<div class="condNoEntry">오늘 기록된 컨디션이 없어요</div>`;
+  } else {
+    el.innerHTML = entries.map((e,i)=>{
+      const timeStr = e.time ? `${e.time} 기록` : "시간 미기록";
+      return `<div class="condEntryCard">
+        <span class="condEntryEmoji">${COND_EMOJI[e.val]||""}</span>
+        <div class="condEntryInfo">
+          <div class="condEntryLabel">${COND_LABEL[e.val]||""}</div>
+          <div class="condEntryTime">${timeStr}${entries.length>1 ? ` · ${i+1}번째` : ""}</div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  // 14일 그래프
+  document.getElementById("condTrackerGraph").innerHTML = "";
+  renderConditionGraph("condTrackerGraph");
+
   // 선택 초기화
   _condTrackerVal = 0;
   document.querySelectorAll("#condTrackerBtns .condBtn").forEach(b=> b.classList.remove("selected"));
   document.getElementById("condTrackerLabel").textContent = "";
   document.getElementById("condTrackerSaveBtn").style.display = "none";
-  renderConditionGraph("condTrackerGraph");
 }
 
 function selectTrackerCond(val){
