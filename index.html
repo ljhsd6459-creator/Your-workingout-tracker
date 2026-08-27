@@ -298,6 +298,28 @@
     padding:10px 18px; border-radius:20px; font-size:13px; font-weight:700; z-index:60; display:none;
   }
   a.condlink{color:var(--accent);}
+  /* 컨디션 오버레이 (첫 오픈) */
+  #condOverlay{
+    position:fixed; inset:0; z-index:9500; background:var(--bg);
+    display:none; flex-direction:column; align-items:center; justify-content:center; padding:24px;
+  }
+  #condOverlayCard{
+    background:var(--card); border:1px solid var(--border); border-radius:18px;
+    padding:26px 22px; max-width:340px; width:100%;
+  }
+  .condOverlayDate{ font-size:12px; color:var(--muted); margin-bottom:4px; text-align:center; }
+  .condOverlayTitle{ font-size:19px; font-weight:700; text-align:center; margin-bottom:18px; }
+  .condSelectedLabel{ text-align:center; font-size:13px; color:var(--accent); min-height:20px; margin-top:10px; }
+  .condOverlayActions{ display:flex; gap:10px; margin-top:16px; }
+  .condOverlayActions button{ flex:1; padding:12px; border-radius:10px; border:none; font-weight:700; font-size:14px; }
+  .condSkipBtn{ background:var(--card2); color:var(--muted); border:1px solid var(--border) !important; }
+  .condConfirmBtn{ background:var(--accent); color:#06201e; }
+  /* 트래킹 모달 항목 */
+  .condEntry{ display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--border); }
+  .condEntryTime{ font-size:12px; color:var(--muted); min-width:36px; }
+  .condEntryEmoji{ font-size:20px; }
+  .condEntryLabel{ font-size:13px; }
+  .condTrackerAddTitle{ font-size:12px; color:var(--muted); margin:14px 0 8px; letter-spacing:.3px; }
   /* 검색창 */
   .searchWrap{ position:relative; margin-bottom:8px; }
   .searchWrap input{
@@ -319,6 +341,47 @@
 </head>
 <body>
 
+<!-- 컨디션 체크인 오버레이 -->
+<div id="condOverlay">
+  <div id="condOverlayCard">
+    <div class="condOverlayDate" id="condOverlayDateLabel"></div>
+    <div class="condOverlayTitle">오늘 컨디션이 어때요? 💪</div>
+    <div class="conditionBtns" id="condOverlayBtns">
+      <button class="condBtn" data-val="1" onclick="selectOverlayCond(1)">😫</button>
+      <button class="condBtn" data-val="2" onclick="selectOverlayCond(2)">😔</button>
+      <button class="condBtn" data-val="3" onclick="selectOverlayCond(3)">😐</button>
+      <button class="condBtn" data-val="4" onclick="selectOverlayCond(4)">😊</button>
+      <button class="condBtn" data-val="5" onclick="selectOverlayCond(5)">💪</button>
+    </div>
+    <div class="condSelectedLabel" id="condOverlayLabel"></div>
+    <svg id="condOverlayGraph" width="100%" height="40" style="margin-top:12px; display:block;"></svg>
+    <div class="condOverlayActions">
+      <button class="condSkipBtn" onclick="closeCondOverlay(false)">건너뛰기</button>
+      <button class="condConfirmBtn" onclick="closeCondOverlay(true)">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- 컨디션 트래킹 모달 -->
+<div class="modal-overlay" id="condTrackerOverlay">
+  <div class="modal" style="max-width:360px;">
+    <h4>📊 컨디션 트래킹</h4>
+    <div id="condTrackerEntries"></div>
+    <div class="condTrackerAddTitle">새 컨디션 추가</div>
+    <div class="conditionBtns" id="condTrackerBtns">
+      <button class="condBtn" data-val="1" onclick="selectTrackerCond(1)">😫</button>
+      <button class="condBtn" data-val="2" onclick="selectTrackerCond(2)">😔</button>
+      <button class="condBtn" data-val="3" onclick="selectTrackerCond(3)">😐</button>
+      <button class="condBtn" data-val="4" onclick="selectTrackerCond(4)">😊</button>
+      <button class="condBtn" data-val="5" onclick="selectTrackerCond(5)">💪</button>
+    </div>
+    <div class="condSelectedLabel" id="condTrackerLabel"></div>
+    <button id="condTrackerSaveBtn" onclick="saveTrackerCond()" style="width:100%;margin-top:10px;padding:10px;border-radius:8px;border:none;background:var(--accent);color:#06201e;font-weight:700;display:none;">기록 저장</button>
+    <svg id="condTrackerGraph" width="100%" height="50" style="margin:12px 0 6px; display:block;"></svg>
+    <button onclick="closeCondTracker()" class="modalClose" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-weight:700;">닫기</button>
+  </div>
+</div>
+
 <header>
   <div class="headerTop">
     <h1 id="appTitle" onclick="openTitleEdit()" style="cursor:pointer;">🏋️ GymBuddy</h1>
@@ -336,18 +399,6 @@
 
 <main>
   <section class="tabpanel active" id="tab-select">
-    <!-- 컨디션 체크 -->
-    <div class="conditionBox" id="conditionBox">
-      <div class="conditionLabel" id="conditionLabel">오늘 컨디션</div>
-      <div class="conditionBtns">
-        <button class="condBtn" data-val="1" onclick="setCondition(1)">😫</button>
-        <button class="condBtn" data-val="2" onclick="setCondition(2)">😔</button>
-        <button class="condBtn" data-val="3" onclick="setCondition(3)">😐</button>
-        <button class="condBtn" data-val="4" onclick="setCondition(4)">😊</button>
-        <button class="condBtn" data-val="5" onclick="setCondition(5)">💪</button>
-      </div>
-      <svg id="conditionGraph" width="100%" height="36" style="margin-top:6px; display:block;"></svg>
-    </div>
     <div class="searchWrap">
       <span class="searchIcon">🔍</span>
       <input type="search" id="exSearchInput" placeholder="운동 검색..." oninput="onExSearch()" onsearch="onExSearch()">
@@ -404,6 +455,7 @@
     <textarea id="journalOutput" placeholder="오늘 운동을 선택하고 세트를 체크한 뒤, '일지 자동 작성'을 눌러보세요."></textarea>
     <div class="btnrow" style="margin-top:14px;">
       <button class="secondary" id="saveHistoryBtn" onclick="saveJournalToHistory()">💾 오늘 기록 저장</button>
+      <button class="secondary" onclick="openCondTracker()">📊 컨디션</button>
     </div>
     <div class="calendarWrap" id="calendarWrap">
       <div class="calHeader">
@@ -2708,66 +2760,152 @@ const BACKUP_KEYS = [
 const COND_EMOJI = ["","😫","😔","😐","😊","💪"];
 const COND_LABEL = ["","최악","별로","보통","좋음","최고"];
 
-function setCondition(val){
+// 날짜별 컨디션 항목 읽기 (이전 데이터 {날짜:숫자} 호환)
+function getCondEntries(dateKey){
+  const cond = JSON.parse(localStorage.getItem(STORAGE_KEY_CONDITION)||"{}");
+  const raw = cond[dateKey];
+  if(!raw) return [];
+  if(typeof raw === 'number') return [{val: raw, time: ""}];
+  return Array.isArray(raw) ? raw : [];
+}
+
+// 새 컨디션 항목 추가 (시간 자동 기록)
+function addConditionEntry(val){
   const today = todayDateKey();
   const cond = JSON.parse(localStorage.getItem(STORAGE_KEY_CONDITION)||"{}");
-  cond[today] = val;
+  const now = new Date();
+  const time = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+  const entries = getCondEntries(today);
+  entries.push({val, time});
+  cond[today] = entries;
   localStorage.setItem(STORAGE_KEY_CONDITION, JSON.stringify(cond));
-  renderConditionSelector();
 }
 
-function renderConditionSelector(){
-  const today = todayDateKey();
-  const cond  = JSON.parse(localStorage.getItem(STORAGE_KEY_CONDITION)||"{}");
-  const cur   = cond[today] || 0;
-  document.querySelectorAll(".condBtn").forEach(btn=>{
-    btn.classList.toggle("selected", parseInt(btn.dataset.val)===cur);
+// ── 첫 오픈 오버레이 ──
+let _condOverlayVal = 0;
+
+function maybeShowCondOverlay(){
+  // 오늘 기록이 이미 있으면 바로 앱 진입
+  if(getCondEntries(todayDateKey()).length > 0) return;
+  // 이 세션에서 이미 보여줬으면 스킵
+  try{ if(sessionStorage.getItem("condShown")) return; }catch(e){}
+  try{ sessionStorage.setItem("condShown","1"); }catch(e){}
+  showCondOverlay();
+}
+
+function showCondOverlay(){
+  _condOverlayVal = 0;
+  const now = new Date();
+  const dayNames = ["일","월","화","수","목","금","토"];
+  document.getElementById("condOverlayDateLabel").textContent =
+    `${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일 (${dayNames[now.getDay()]})`;
+  document.querySelectorAll("#condOverlayBtns .condBtn").forEach(b=> b.classList.remove("selected"));
+  document.getElementById("condOverlayLabel").textContent = "";
+  renderConditionGraph("condOverlayGraph");
+  document.getElementById("condOverlay").style.display = "flex";
+}
+
+function selectOverlayCond(val){
+  _condOverlayVal = val;
+  document.querySelectorAll("#condOverlayBtns .condBtn").forEach(b=>{
+    b.classList.toggle("selected", +b.dataset.val === val);
   });
-  renderConditionGraph();
+  document.getElementById("condOverlayLabel").textContent = COND_EMOJI[val] + " " + COND_LABEL[val];
 }
 
-function renderConditionGraph(){
-  const svg   = document.getElementById("conditionGraph");
+function closeCondOverlay(confirm){
+  if(confirm && _condOverlayVal > 0) addConditionEntry(_condOverlayVal);
+  document.getElementById("condOverlay").style.display = "none";
+}
+
+// ── 트래킹 모달 (일지 탭) ──
+let _condTrackerVal = 0;
+
+function openCondTracker(){
+  _condTrackerVal = 0;
+  renderCondTracker();
+  document.getElementById("condTrackerOverlay").classList.add("show");
+}
+
+function closeCondTracker(){
+  document.getElementById("condTrackerOverlay").classList.remove("show");
+}
+
+function renderCondTracker(){
+  const today = todayDateKey();
+  const entries = getCondEntries(today);
+  const el = document.getElementById("condTrackerEntries");
+  el.innerHTML = entries.length === 0
+    ? `<div style="font-size:13px;color:var(--muted);padding:8px 0 4px;">오늘 기록 없음</div>`
+    : entries.map(e=>
+        `<div class="condEntry">
+          <span class="condEntryTime">${e.time||"--:--"}</span>
+          <span class="condEntryEmoji">${COND_EMOJI[e.val]||""}</span>
+          <span class="condEntryLabel">${COND_LABEL[e.val]||""}</span>
+        </div>`
+      ).join("");
+  // 선택 초기화
+  _condTrackerVal = 0;
+  document.querySelectorAll("#condTrackerBtns .condBtn").forEach(b=> b.classList.remove("selected"));
+  document.getElementById("condTrackerLabel").textContent = "";
+  document.getElementById("condTrackerSaveBtn").style.display = "none";
+  renderConditionGraph("condTrackerGraph");
+}
+
+function selectTrackerCond(val){
+  _condTrackerVal = val;
+  document.querySelectorAll("#condTrackerBtns .condBtn").forEach(b=>{
+    b.classList.toggle("selected", +b.dataset.val === val);
+  });
+  document.getElementById("condTrackerLabel").textContent = COND_EMOJI[val] + " " + COND_LABEL[val];
+  document.getElementById("condTrackerSaveBtn").style.display = "block";
+}
+
+function saveTrackerCond(){
+  if(!_condTrackerVal) return;
+  addConditionEntry(_condTrackerVal);
+  renderCondTracker();
+  showToast("컨디션 기록됨!");
+}
+
+// 그래프 공통 (svgId 지정 가능 — 오버레이/트래커 모달 양쪽 사용)
+function renderConditionGraph(svgId){
+  const svg = document.getElementById(svgId || "condOverlayGraph");
   if(!svg) return;
-  const cond  = JSON.parse(localStorage.getItem(STORAGE_KEY_CONDITION)||"{}");
-  // 최근 14일
-  const days  = [];
-  const now   = new Date();
+  const H = parseFloat(svg.getAttribute("height")) || 40;
+  const days = [];
+  const now = new Date();
   for(let i=13;i>=0;i--){
     const d = new Date(now); d.setDate(d.getDate()-i);
     const k = d.toISOString().slice(0,10);
-    days.push({ key:k, val: cond[k]||0 });
+    const entries = getCondEntries(k);
+    const val = entries.length > 0 ? entries[entries.length-1].val : 0; // 하루 마지막 기록 기준
+    days.push({key:k, val});
   }
   const hasAny = days.some(d=>d.val>0);
   if(!hasAny){ svg.innerHTML=""; return; }
-  const W=svg.getBoundingClientRect().width||280, H=36;
+  const W = svg.getBoundingClientRect().width || 280;
   const padL=6, padR=6, padT=4, padB=4;
-  const n=days.length;
-  const xOf=i=>padL+(i/(n-1))*(W-padL-padR);
-  const yOf=v=>H-padB-(v/5)*(H-padT-padB);
-  // 선
-  let pathD="";
+  const n = days.length;
+  const xOf = i => padL + (i/(n-1)) * (W-padL-padR);
+  const yOf = v => H - padB - (v/5) * (H-padT-padB);
+  let pathD = "";
   days.forEach((d,i)=>{
     if(d.val===0) return;
     const x=xOf(i), y=yOf(d.val);
-    pathD+=pathD?"":""
-    if(!pathD) pathD=`M${x},${y}`;
-    else pathD+=` L${x},${y}`;
+    if(!pathD) pathD=`M${x},${y}`; else pathD+=` L${x},${y}`;
   });
-  // 점 + 선 SVG
-  let dots="";
+  let dots = "";
   days.forEach((d,i)=>{
     if(d.val===0) return;
-    dots+=`<circle cx="${xOf(i)}" cy="${yOf(d.val)}" r="3.5" fill="var(--accent)" opacity=".9"/>`;
+    dots += `<circle cx="${xOf(i)}" cy="${yOf(d.val)}" r="3.5" fill="var(--accent)" opacity=".9"/>`;
   });
-  // 오늘 표시
-  const todayIdx=days.findIndex(d=>d.key===todayDateKey());
+  const todayIdx = days.findIndex(d=>d.key===todayDateKey());
   if(todayIdx>=0 && days[todayIdx].val>0){
-    dots+=`<circle cx="${xOf(todayIdx)}" cy="${yOf(days[todayIdx].val)}" r="5.5" fill="none" stroke="var(--accent)" stroke-width="2"/>`;
+    dots += `<circle cx="${xOf(todayIdx)}" cy="${yOf(days[todayIdx].val)}" r="5.5" fill="none" stroke="var(--accent)" stroke-width="2"/>`;
   }
-  svg.innerHTML=
-    `<path d="${pathD}" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity=".6"/>`
-    +dots;
+  svg.innerHTML =
+    `<path d="${pathD}" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity=".6"/>` + dots;
 }
 
 /* ===================== 서비스워커 (백그라운드 타이머 알림) ===================== */
@@ -2873,7 +3011,7 @@ document.getElementById("runDateInput").value = todayDateKey();
 renderRunHistory();
 renderRunCalendar();
 initWorkoutTimerUI();
-renderConditionSelector();
+maybeShowCondOverlay();
 if(didResetForNewDay){ showToast(t().toastNewDay); }
 </script>
 <script data-goatcounter="https://ljhsd6459.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
