@@ -346,6 +346,22 @@
   }
   /* reps 탭하면 입력 */
   .repsValue{ cursor:pointer; text-decoration:underline dotted var(--muted); }
+  /* 운동별 메모 */
+  .exMemoWrap{ margin-top:8px; border-top:1px solid var(--border); padding-top:8px; }
+  .exMemoToggle{
+    font-size:12px; background:none; border:none; color:var(--muted);
+    cursor:pointer; padding:0; display:flex; align-items:center; gap:5px; line-height:1.3;
+  }
+  .exMemoToggle.hasNote{ color:var(--accent2); }
+  .exMemoArea{
+    display:none; width:100%; min-height:58px; margin-top:7px;
+    padding:8px 10px; border-radius:8px; border:1px solid var(--border);
+    background:var(--card2); color:var(--text); font-size:13px;
+    line-height:1.5; resize:vertical; box-sizing:border-box; font-family:inherit;
+  }
+  .exMemoArea.open{ display:block; }
+  /* 이전 메모 힌트 */
+  .prevNoteHint{ margin-top:3px; font-size:11px; color:var(--accent2); opacity:.85; }
 </style>
 </head>
 <body>
@@ -1408,7 +1424,7 @@ function addCustomExercise(){
 }
 
 /* ===================== 카운터 ===================== */
-function buildPrevHint(p){
+function buildPrevHint(p, id){
   if(!p) return "";
   const isKo = currentLang === "ko";
 
@@ -1440,13 +1456,38 @@ function buildPrevHint(p){
     weightStr = "@ " + (allSame ? weights[0] : weights.join("/")) + unit;
   }
 
-  const detail = [setsReps, weightStr].filter(Boolean).join(" ");
+  const detail = [setsReps, weightStr].filter(Boolean).join(" ");
+
+  // 이전 볼륨 조회 (STORAGE_KEY_VOLUME에서)
+  let volStr = "";
+  if(id && p.date){
+    try{
+      const volData = JSON.parse(localStorage.getItem(STORAGE_KEY_VOLUME)||"{}");
+      const dayEntry = volData[p.date];
+      if(dayEntry && dayEntry.byExercise && dayEntry.byExercise[id]){
+        const ev = dayEntry.byExercise[id];
+        if(ev.volume > 0){
+          const vu = ev.unit || unit;
+          volStr = isKo
+            ? ` · 볼륨 ${ev.volume.toLocaleString()}${vu}`
+            : ` · vol ${ev.volume.toLocaleString()}${vu}`;
+        }
+      }
+    }catch(e){}
+  }
 
   const msg = isKo
-    ? `${dateStr}에 ${detail} 하셨어요 💪`
-    : `Last time on ${dateStr}${detail ? " — " + detail : ""} 💪`;
+    ? `${dateStr}에 ${detail}${volStr} 하셨어요 💪`
+    : `Last time on ${dateStr}${detail ? " — " + detail : ""}${volStr} 💪`;
 
-  return `<div class="prevSessionHint">📋 ${msg}</div>`;
+  // 이전 메모 표시
+  let noteHtml = "";
+  if(p.note){
+    const escaped = p.note.replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    noteHtml = `<div class="prevNoteHint">📌 ${escaped}</div>`;
+  }
+
+  return `<div class="prevSessionHint">📋 ${msg}${noteHtml}</div>`;
 }
 
 function renderCounter(){
@@ -1475,7 +1516,7 @@ function renderCounter(){
     const ex = findExerciseById(st.cat, id);
     const displayName = ex ? getDisplayName(ex) : st.name;
     const tipText = ex ? getDisplayTip(ex) : "";
-    const prevHtml = buildPrevHint(prevSession[id]);
+    const prevHtml = buildPrevHint(prevSession[id], id);
     const card = document.createElement("div");
     card.className = "counter-card";
     const rowsHtml = st.done.map((d,i)=>{
@@ -1515,6 +1556,10 @@ function renderCounter(){
         <button class="cardRestBtn" data-act="rest1">${u.restTimer1}</button>
         <button class="cardRestBtn" data-act="rest2">${u.restTimer2}</button>
         <button class="cardRestBtn" data-act="rest3">${u.restTimer3}</button>
+      </div>
+      <div class="exMemoWrap">
+        <button class="exMemoToggle${st.note ? ' hasNote' : ''}" data-act="memoToggle">📝 ${st.note ? (currentLang==="ko" ? "메모 보기" : "View note") : (currentLang==="ko" ? "메모 추가" : "Add note")}</button>
+        <textarea class="exMemoArea${st.note ? ' open' : ''}" data-act="memoArea" placeholder="${currentLang==="ko" ? "이 운동에 대한 메모..." : "Note for this exercise..."}">${(st.note||'').replace(/</g,"&lt;").replace(/>/g,"&gt;")}</textarea>
       </div>
     `;
     card.querySelectorAll('[data-act="toggleDone"]').forEach(btn=>{
@@ -1576,6 +1621,22 @@ function renderCounter(){
     card.querySelector('[data-act="rest1"]').onclick = ()=>startRestTimer(60, id, displayName);
     card.querySelector('[data-act="rest2"]').onclick = ()=>startRestTimer(120, id, displayName);
     card.querySelector('[data-act="rest3"]').onclick = ()=>startRestTimer(180, id, displayName);
+    // 메모 토글 & 저장
+    card.querySelector('[data-act="memoToggle"]').onclick = ()=>{
+      const area = card.querySelector('[data-act="memoArea"]');
+      area.classList.toggle('open');
+      if(area.classList.contains('open')) area.focus();
+    };
+    card.querySelector('[data-act="memoArea"]').oninput = (e)=>{
+      st.note = e.target.value;
+      const toggle = card.querySelector('[data-act="memoToggle"]');
+      const hasNote = !!e.target.value;
+      toggle.classList.toggle('hasNote', hasNote);
+      toggle.textContent = '📝 ' + (hasNote
+        ? (currentLang==="ko" ? "메모 보기" : "View note")
+        : (currentLang==="ko" ? "메모 추가" : "Add note"));
+      saveToday();
+    };
     list.appendChild(card);
   });
   updateProgress();
@@ -1680,7 +1741,8 @@ function saveJournalToHistory(){
           sets: idxs.length,
           reps: idxs.map(i=> (s.reps && s.reps[i]!=null) ? s.reps[i] : 10),
           weights: idxs.map(i=> (s.weights && s.weights[i]!=null && s.weights[i]!=="") ? s.weights[i] : ""),
-          unit: s.unit || "kg"
+          unit: s.unit || "kg",
+          note: s.note || ""
         };
       }
     });
@@ -1707,7 +1769,8 @@ function saveJournalToHistory(){
             volume: Math.round(exVol),
             reps: idxs.map(i=> (s.reps&&s.reps[i]!=null) ? s.reps[i] : 10),
             weights: idxs.map(i=> (s.weights&&s.weights[i]!=null&&s.weights[i]!=="") ? s.weights[i] : ""),
-            unit: s.unit || "kg"
+            unit: s.unit || "kg",
+            note: s.note || ""
           };
         }
       });
