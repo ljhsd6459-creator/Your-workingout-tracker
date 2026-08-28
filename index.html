@@ -1713,6 +1713,37 @@ function generateJournal(){
   }
   lines.push("");
   lines.push(`${u.journalCheckpointPrefix} ${getDisplayNote()}`);
+
+  // 볼륨 계산 및 추가
+  try{
+    let totalVol = 0;
+    const volLines = [];
+    entries.forEach(id=>{
+      const s = todayState[id];
+      syncDoneLength(s);
+      const doneIdxs = s.done.map((d,i)=>d?i:-1).filter(i=>i>=0);
+      const idxs = doneIdxs.length > 0 ? doneIdxs : [...Array(s.sets).keys()];
+      let exVol = 0;
+      idxs.forEach(i=>{
+        const w = parseFloat((s.weights&&s.weights[i]) || 0) || 0;
+        const r = parseInt((s.reps&&s.reps[i]) || 10) || 10;
+        exVol += w * r;
+      });
+      if(exVol > 0){
+        const ex = findExerciseById(s.cat, id);
+        const nm = ex ? getDisplayName(ex) : s.name;
+        volLines.push(`  - ${nm}: ${Math.round(exVol).toLocaleString()}${s.unit||"kg"}`);
+        totalVol += exVol;
+      }
+    });
+    if(totalVol > 0){
+      lines.push("");
+      lines.push(currentLang==="ko" ? "📊 볼륨 (무게 × 횟수)" : "📊 Volume (weight × reps)");
+      volLines.forEach(l=>lines.push(l));
+      lines.push((currentLang==="ko" ? "  합계: " : "  Total: ") + Math.round(totalVol).toLocaleString() + (u.weightUnit||"kg"));
+    }
+  }catch(e){}
+
   document.getElementById("journalOutput").value = lines.join("\n");
 }
 
@@ -1803,7 +1834,13 @@ function renderHistory(){
   history.forEach((h,idx)=>{
     const div = document.createElement("div");
     div.className = "historyitem";
-    div.innerHTML = `<div class="hrow"><div class="hdate">${h.date}</div><button class="hDeleteBtn" data-idx="${idx}">🗑</button></div><div>${h.text.split("\n")[0]}</div>`;
+    let _volBadge = "";
+    try{
+      const _vd = JSON.parse(localStorage.getItem(STORAGE_KEY_VOLUME)||"{}");
+      const _dv = _vd[h.date];
+      if(_dv && _dv.volume > 0) _volBadge = `<span class="volumeBadge">${_dv.volume.toLocaleString()}kg</span>`;
+    }catch(e){}
+    div.innerHTML = `<div class="hrow"><div class="hdate">${h.date}${_volBadge}</div><button class="hDeleteBtn" data-idx="${idx}">🗑</button></div><div>${h.text.split("\n")[0]}</div>`;
     div.onclick = (e)=>{
       if(e.target.classList.contains("hDeleteBtn")) return;
       document.getElementById("journalOutput").value = h.text; switchTab('tab-journal');
