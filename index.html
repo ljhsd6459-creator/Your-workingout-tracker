@@ -97,10 +97,9 @@
     background:var(--card2); border:1px solid var(--border); color:var(--muted); border-radius:6px; padding:4px 8px; font-size:12px;
   }
   .counter-card .ctop .actions button[data-act="remove"]{color:#ff8a8a; font-size:13px;}
-  .dragHandle{cursor:grab;color:var(--muted);font-size:20px;padding:0 6px 0 0;touch-action:none;flex:0 0 auto;user-select:none;line-height:1;}
-  .dragHandle:active{cursor:grabbing;}
-  .counter-card.dragging{opacity:.35;border-style:dashed;}
-  .counter-card.drag-over{border-color:var(--accent);background:rgba(90,209,201,.08);}
+  .orderBtns{display:flex;flex-direction:column;gap:2px;flex:0 0 auto;}
+  .orderBtn{background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:5px;width:22px;height:22px;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;}
+  .orderBtn:disabled{opacity:.2;}
   .prevSessionHint{font-size:11.5px; color:var(--muted); margin:-2px 0 6px; padding:5px 8px; background:rgba(255,255,255,.04); border-radius:6px; line-height:1.5;}
   .cardRestRow{display:flex; gap:6px; margin-top:10px; align-items:center; border-top:1px solid var(--border); padding-top:10px;}
   .cardRestLabel{font-size:11px; color:var(--muted); flex:0 0 auto;}
@@ -1576,7 +1575,10 @@ function renderCounter(){
     }).join("");
     card.innerHTML = `
       <div class="ctop">
-        <span class="dragHandle" title="Drag to reorder">⠿</span>
+        <div class="orderBtns">
+          <button class="orderBtn" data-act="moveUp" title="Move up">▲</button>
+          <button class="orderBtn" data-act="moveDown" title="Move down">▼</button>
+        </div>
         <div class="cname">${displayName}</div>
         <div class="actions">
           <button data-act="reset">↺</button>
@@ -1679,80 +1681,31 @@ function renderCounter(){
         : (currentLang==="ko" ? "메모 추가" : "Add note"));
       saveToday();
     };
-    // ── Drag-to-reorder (desktop HTML5 drag + touch) ──────────────────────────
+    // ── ↑↓ 순서 변경 버튼 ────────────────────────────────────────────────────
     card.dataset.exid = id;
-    card.setAttribute("draggable", "true");
-    let touchDragClone = null, touchDragSrc = null;
-    card.addEventListener("dragstart", e=>{
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", id);
-      setTimeout(()=>card.classList.add("dragging"), 0);
-    });
-    card.addEventListener("dragend", ()=>{
-      card.classList.remove("dragging");
-      list.querySelectorAll(".counter-card").forEach(c=>c.classList.remove("drag-over"));
-    });
-    card.addEventListener("dragover", e=>{
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      card.classList.add("drag-over");
-    });
-    card.addEventListener("dragleave", e=>{
-      if(!card.contains(e.relatedTarget)) card.classList.remove("drag-over");
-    });
-    card.addEventListener("drop", e=>{
-      e.preventDefault();
-      card.classList.remove("drag-over");
-      const draggedId = e.dataTransfer.getData("text/plain");
-      if(draggedId === id) return;
+    const moveCard = (dir)=>{
       const cards = [...list.querySelectorAll(".counter-card")];
       const orderedIds = cards.map(c=>c.dataset.exid);
-      const fromIdx = orderedIds.indexOf(draggedId);
-      const toIdx = orderedIds.indexOf(id);
-      if(fromIdx===-1 || toIdx===-1) return;
-      orderedIds.splice(fromIdx, 1);
-      orderedIds.splice(toIdx, 0, draggedId);
+      const idx = orderedIds.indexOf(id);
+      const newIdx = idx + dir;
+      if(newIdx < 0 || newIdx >= orderedIds.length) return;
+      orderedIds.splice(idx, 1);
+      orderedIds.splice(newIdx, 0, id);
       localStorage.setItem(STORAGE_KEY_COUNTER_ORDER, JSON.stringify(orderedIds));
       renderCounter();
-    });
-    // Touch drag support (for mobile)
-    const handle = card.querySelector(".dragHandle");
-    handle.addEventListener("touchstart", e=>{
-      touchDragSrc = card;
-      card.classList.add("dragging");
-      e.preventDefault();
-    }, {passive:false});
-    handle.addEventListener("touchmove", e=>{
-      e.preventDefault();
-      const touch = e.touches[0];
-      const el = document.elementFromPoint(touch.clientX, touch.clientY);
-      list.querySelectorAll(".counter-card").forEach(c=>c.classList.remove("drag-over"));
-      if(!el) return;
-      const target = el.closest(".counter-card");
-      if(target && target !== card) target.classList.add("drag-over");
-    }, {passive:false});
-    handle.addEventListener("touchend", e=>{
-      card.classList.remove("dragging");
-      const touch = e.changedTouches[0];
-      const el = document.elementFromPoint(touch.clientX, touch.clientY);
-      list.querySelectorAll(".counter-card").forEach(c=>c.classList.remove("drag-over"));
-      if(!el) return;
-      const target = el.closest(".counter-card");
-      if(target && target !== card){
-        const cards = [...list.querySelectorAll(".counter-card")];
-        const orderedIds = cards.map(c=>c.dataset.exid);
-        const fromIdx = orderedIds.indexOf(card.dataset.exid);
-        const toIdx = orderedIds.indexOf(target.dataset.exid);
-        if(fromIdx!==-1 && toIdx!==-1){
-          orderedIds.splice(fromIdx, 1);
-          orderedIds.splice(toIdx, 0, card.dataset.exid);
-          localStorage.setItem(STORAGE_KEY_COUNTER_ORDER, JSON.stringify(orderedIds));
-          renderCounter();
-        }
-      }
-    }, {passive:false});
+    };
+    card.querySelector('[data-act="moveUp"]').onclick = ()=>moveCard(-1);
+    card.querySelector('[data-act="moveDown"]').onclick = ()=>moveCard(1);
     // ────────────────────────────────────────────────────────────────────────
     list.appendChild(card);
+  });
+  // Disable ↑ on first card, ↓ on last card
+  const allCards = list.querySelectorAll(".counter-card");
+  allCards.forEach((c, i)=>{
+    const up = c.querySelector('[data-act="moveUp"]');
+    const dn = c.querySelector('[data-act="moveDown"]');
+    if(up) up.disabled = (i === 0);
+    if(dn) dn.disabled = (i === allCards.length - 1);
   });
   updateProgress();
 }
