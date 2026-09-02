@@ -97,6 +97,10 @@
     background:var(--card2); border:1px solid var(--border); color:var(--muted); border-radius:6px; padding:4px 8px; font-size:12px;
   }
   .counter-card .ctop .actions button[data-act="remove"]{color:#ff8a8a; font-size:13px;}
+  .dragHandle{cursor:grab;color:var(--muted);font-size:20px;padding:0 6px 0 0;touch-action:none;flex:0 0 auto;user-select:none;line-height:1;}
+  .dragHandle:active{cursor:grabbing;}
+  .counter-card.dragging{opacity:.35;border-style:dashed;}
+  .counter-card.drag-over{border-color:var(--accent);background:rgba(90,209,201,.08);}
   .prevSessionHint{font-size:11.5px; color:var(--muted); margin:-2px 0 6px; padding:5px 8px; background:rgba(255,255,255,.04); border-radius:6px; line-height:1.5;}
   .cardRestRow{display:flex; gap:6px; margin-top:10px; align-items:center; border-top:1px solid var(--border); padding-top:10px;}
   .cardRestLabel{font-size:11px; color:var(--muted); flex:0 0 auto;}
@@ -370,7 +374,7 @@
 <div id="condOverlay">
   <div id="condOverlayCard">
     <div class="condOverlayDate" id="condOverlayDateLabel"></div>
-    <div class="condOverlayTitle">오늘 컨디션이 어때요? 💪</div>
+    <div class="condOverlayTitle" id="condOverlayTitleEl">오늘 컨디션이 어때요? 💪</div>
     <div class="conditionBtns" id="condOverlayBtns">
       <button class="condBtn" data-val="1" onclick="selectOverlayCond(1)">😫</button>
       <button class="condBtn" data-val="2" onclick="selectOverlayCond(2)">😔</button>
@@ -381,8 +385,8 @@
     <div class="condSelectedLabel" id="condOverlayLabel"></div>
     <svg id="condOverlayGraph" width="100%" height="40" style="margin-top:12px; display:block;"></svg>
     <div class="condOverlayActions">
-      <button class="condSkipBtn" onclick="closeCondOverlay(false)">건너뛰기</button>
-      <button class="condConfirmBtn" onclick="closeCondOverlay(true)">확인</button>
+      <button class="condSkipBtn" id="condOverlaySkipBtnEl" onclick="closeCondOverlay(false)">건너뛰기</button>
+      <button class="condConfirmBtn" id="condOverlayConfirmBtnEl" onclick="closeCondOverlay(true)">확인</button>
     </div>
   </div>
 </div>
@@ -390,13 +394,13 @@
 <!-- 컨디션 트래킹 모달 -->
 <div class="modal-overlay" id="condTrackerOverlay">
   <div class="modal" style="max-width:360px;">
-    <h4>📊 컨디션 트래킹</h4>
+    <h4 id="condTrackerTitleEl">📊 컨디션 트래킹</h4>
     <div id="condTrackerEntries"></div>
     <div class="condTrackerGraphWrap">
-      <div class="condTrackerGraphTitle">최근 14일</div>
+      <div class="condTrackerGraphTitle" id="condTrackerGraphTitleEl">최근 14일</div>
       <svg id="condTrackerGraph" width="100%" height="46" style="display:block;"></svg>
     </div>
-    <div class="condTrackerDivider">+ 지금 컨디션 추가</div>
+    <div class="condTrackerDivider" id="condTrackerDividerEl">+ 지금 컨디션 추가</div>
     <div class="conditionBtns" id="condTrackerBtns">
       <button class="condBtn" data-val="1" onclick="selectTrackerCond(1)">😫</button>
       <button class="condBtn" data-val="2" onclick="selectTrackerCond(2)">😔</button>
@@ -406,7 +410,7 @@
     </div>
     <div class="condSelectedLabel" id="condTrackerLabel"></div>
     <button id="condTrackerSaveBtn" onclick="saveTrackerCond()" style="width:100%;margin-top:10px;padding:10px;border-radius:8px;border:none;background:var(--accent);color:#06201e;font-weight:700;display:none;">지금 시간으로 저장</button>
-    <button onclick="closeCondTracker()" class="modalClose" style="width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-weight:700;">닫기</button>
+    <button onclick="closeCondTracker()" class="modalClose" id="condTrackerCloseBtnEl" style="width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-weight:700;">닫기</button>
   </div>
 </div>
 
@@ -782,7 +786,16 @@ const UI = {
     feedbackSend:"보내기", feedbackClose:"닫기",
     feedbackSubject:"운동 트래커 피드백",
     toastFeedbackNeedText:"내용을 입력해주세요",
-    toastFeedbackSent:"메일 앱이 열려요. 보내기를 눌러 완료해주세요"
+    toastFeedbackSent:"메일 앱이 열려요. 보내기를 눌러 완료해주세요",
+    condOverlayTitle:"오늘 컨디션이 어때요? 💪",
+    condOverlaySkip:"건너뛰기", condOverlayConfirm:"확인",
+    condTrackerTitle:"📊 컨디션 트래킹", condTrackerGraphTitle:"최근 14일",
+    condTrackerDivider:"+ 지금 컨디션 추가", condTrackerSave:"지금 시간으로 저장", condTrackerClose:"닫기",
+    condNoEntry:"오늘 기록된 컨디션이 없어요",
+    condTimeRecorded:"기록", condTimeUnknown:"시간 미기록",
+    condNth:(n)=>`${n}번째`,
+    condTrackerToast:"컨디션 기록됨!",
+    searchEmpty:"검색 결과 없음"
   },
   en: {
     appTitle:"🏋️ GymBuddy", langBtn:"한국어",
@@ -851,7 +864,16 @@ const UI = {
     feedbackSend:"Send", feedbackClose:"Close",
     feedbackSubject:"Workout Tracker Feedback",
     toastFeedbackNeedText:"Please enter your feedback",
-    toastFeedbackSent:"Your mail app should be open — tap send to finish"
+    toastFeedbackSent:"Your mail app should be open — tap send to finish",
+    condOverlayTitle:"How are you feeling today? 💪",
+    condOverlaySkip:"Skip", condOverlayConfirm:"Confirm",
+    condTrackerTitle:"📊 Condition Tracker", condTrackerGraphTitle:"Last 14 days",
+    condTrackerDivider:"+ Add condition now", condTrackerSave:"Save with current time", condTrackerClose:"Close",
+    condNoEntry:"No condition recorded today",
+    condTimeRecorded:"recorded", condTimeUnknown:"No time recorded",
+    condNth:(n)=>`#${n}`,
+    condTrackerToast:"Condition saved!",
+    searchEmpty:"No results found"
   }
 };
 function t(){ return UI[currentLang] || UI.ko; }
@@ -951,6 +973,7 @@ const STORAGE_KEY_EX_HISTORY = "wt_exHistory_v1"; // 운동별 마지막 기록 
 const STORAGE_KEY_VOLUME    = "wt_volume_v1";    // 날짜별 볼륨·운동시간 기록
 const STORAGE_KEY_CONDITION = "wt_condition_v1"; // 날짜별 컨디션 (1~5)
 const STORAGE_KEY_BUILTIN_SNAPSHOT = "wt_builtin_snapshot_v1"; // 내장 운동 스냅샷 (export 복원용)
+const STORAGE_KEY_COUNTER_ORDER = "wt_counter_order_v1"; // 카운터 탭 운동 순서
 
 let currentCat = "등";
 let todayState = loadToday(); // { id: {checked:bool, sets:int, done:[bool,...]} }
@@ -1199,6 +1222,14 @@ function applyStaticLanguage(){
   document.getElementById("feedbackInput").placeholder = u.feedbackInputPh;
   document.getElementById("feedbackSendBtn").textContent = u.feedbackSend;
   document.getElementById("feedbackCloseBtn").textContent = u.feedbackClose;
+  document.getElementById("condOverlayTitleEl").textContent = u.condOverlayTitle;
+  document.getElementById("condOverlaySkipBtnEl").textContent = u.condOverlaySkip;
+  document.getElementById("condOverlayConfirmBtnEl").textContent = u.condOverlayConfirm;
+  document.getElementById("condTrackerTitleEl").textContent = u.condTrackerTitle;
+  document.getElementById("condTrackerGraphTitleEl").textContent = u.condTrackerGraphTitle;
+  document.getElementById("condTrackerDividerEl").textContent = u.condTrackerDivider;
+  document.getElementById("condTrackerSaveBtn").textContent = u.condTrackerSave;
+  document.getElementById("condTrackerCloseBtnEl").textContent = u.condTrackerClose;
   if(typeof refreshWorkoutTimerButton === "function") refreshWorkoutTimerButton();
   renderTodayLabel();
   renderNoteBox();
@@ -1323,7 +1354,7 @@ function renderExerciseList(){
   }
 
   if(q && pool.length === 0){
-    list.innerHTML = `<div class="empty">검색 결과 없음</div>`;
+    list.innerHTML = `<div class="empty">${t().searchEmpty}</div>`;
     return;
   }
 
@@ -1495,6 +1526,16 @@ function renderCounter(){
   const u = t();
   list.innerHTML = "";
   const entries = Object.keys(todayState).filter(id=>todayState[id].checked);
+  // Apply saved counter order
+  let counterOrder = [];
+  try{ counterOrder = JSON.parse(localStorage.getItem(STORAGE_KEY_COUNTER_ORDER)||"[]"); }catch(e){}
+  entries.sort((a,b)=>{
+    const ia = counterOrder.indexOf(a), ib = counterOrder.indexOf(b);
+    if(ia===-1 && ib===-1) return 0;
+    if(ia===-1) return 1;
+    if(ib===-1) return -1;
+    return ia - ib;
+  });
   if(entries.length===0){
     list.innerHTML = `<div class="empty">${u.counterEmpty}</div>`;
     const oldHint = document.getElementById("counterTapHint");
@@ -1535,6 +1576,7 @@ function renderCounter(){
     }).join("");
     card.innerHTML = `
       <div class="ctop">
+        <span class="dragHandle" title="Drag to reorder">⠿</span>
         <div class="cname">${displayName}</div>
         <div class="actions">
           <button data-act="reset">↺</button>
@@ -1637,6 +1679,79 @@ function renderCounter(){
         : (currentLang==="ko" ? "메모 추가" : "Add note"));
       saveToday();
     };
+    // ── Drag-to-reorder (desktop HTML5 drag + touch) ──────────────────────────
+    card.dataset.exid = id;
+    card.setAttribute("draggable", "true");
+    let touchDragClone = null, touchDragSrc = null;
+    card.addEventListener("dragstart", e=>{
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", id);
+      setTimeout(()=>card.classList.add("dragging"), 0);
+    });
+    card.addEventListener("dragend", ()=>{
+      card.classList.remove("dragging");
+      list.querySelectorAll(".counter-card").forEach(c=>c.classList.remove("drag-over"));
+    });
+    card.addEventListener("dragover", e=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      card.classList.add("drag-over");
+    });
+    card.addEventListener("dragleave", e=>{
+      if(!card.contains(e.relatedTarget)) card.classList.remove("drag-over");
+    });
+    card.addEventListener("drop", e=>{
+      e.preventDefault();
+      card.classList.remove("drag-over");
+      const draggedId = e.dataTransfer.getData("text/plain");
+      if(draggedId === id) return;
+      const cards = [...list.querySelectorAll(".counter-card")];
+      const orderedIds = cards.map(c=>c.dataset.exid);
+      const fromIdx = orderedIds.indexOf(draggedId);
+      const toIdx = orderedIds.indexOf(id);
+      if(fromIdx===-1 || toIdx===-1) return;
+      orderedIds.splice(fromIdx, 1);
+      orderedIds.splice(toIdx, 0, draggedId);
+      localStorage.setItem(STORAGE_KEY_COUNTER_ORDER, JSON.stringify(orderedIds));
+      renderCounter();
+    });
+    // Touch drag support (for mobile)
+    const handle = card.querySelector(".dragHandle");
+    handle.addEventListener("touchstart", e=>{
+      touchDragSrc = card;
+      card.classList.add("dragging");
+      e.preventDefault();
+    }, {passive:false});
+    handle.addEventListener("touchmove", e=>{
+      e.preventDefault();
+      const touch = e.touches[0];
+      const el = document.elementFromPoint(touch.clientX, touch.clientY);
+      list.querySelectorAll(".counter-card").forEach(c=>c.classList.remove("drag-over"));
+      if(!el) return;
+      const target = el.closest(".counter-card");
+      if(target && target !== card) target.classList.add("drag-over");
+    }, {passive:false});
+    handle.addEventListener("touchend", e=>{
+      card.classList.remove("dragging");
+      const touch = e.changedTouches[0];
+      const el = document.elementFromPoint(touch.clientX, touch.clientY);
+      list.querySelectorAll(".counter-card").forEach(c=>c.classList.remove("drag-over"));
+      if(!el) return;
+      const target = el.closest(".counter-card");
+      if(target && target !== card){
+        const cards = [...list.querySelectorAll(".counter-card")];
+        const orderedIds = cards.map(c=>c.dataset.exid);
+        const fromIdx = orderedIds.indexOf(card.dataset.exid);
+        const toIdx = orderedIds.indexOf(target.dataset.exid);
+        if(fromIdx!==-1 && toIdx!==-1){
+          orderedIds.splice(fromIdx, 1);
+          orderedIds.splice(toIdx, 0, card.dataset.exid);
+          localStorage.setItem(STORAGE_KEY_COUNTER_ORDER, JSON.stringify(orderedIds));
+          renderCounter();
+        }
+      }
+    }, {passive:false});
+    // ────────────────────────────────────────────────────────────────────────
     list.appendChild(card);
   });
   updateProgress();
@@ -1669,6 +1784,16 @@ function completeAllSets(){
 function generateJournal(){
   const u = t();
   const entries = Object.keys(todayState).filter(id=>todayState[id].checked);
+  // Apply saved counter order
+  let counterOrder = [];
+  try{ counterOrder = JSON.parse(localStorage.getItem(STORAGE_KEY_COUNTER_ORDER)||"[]"); }catch(e){}
+  entries.sort((a,b)=>{
+    const ia = counterOrder.indexOf(a), ib = counterOrder.indexOf(b);
+    if(ia===-1 && ib===-1) return 0;
+    if(ia===-1) return 1;
+    if(ib===-1) return -1;
+    return ia - ib;
+  });
   if(entries.length===0){
     document.getElementById("journalOutput").value = u.journalNoSelection;
     return;
@@ -2870,7 +2995,9 @@ const BACKUP_KEYS = [
 
 /* ===================== 컨디션 트래커 ===================== */
 const COND_EMOJI = ["","😫","😔","😐","😊","💪"];
-const COND_LABEL = ["","최악","별로","보통","좋음","최고"];
+const COND_LABEL_KO = ["","최악","별로","보통","좋음","최고"];
+const COND_LABEL_EN = ["","Bad","Meh","OK","Good","Great"];
+function condLabel(v){ return (currentLang==="ko" ? COND_LABEL_KO : COND_LABEL_EN)[v] || ""; }
 
 // 날짜별 컨디션 항목 읽기 (이전 데이터 {날짜:숫자} 호환)
 function getCondEntries(dateKey){
@@ -2908,9 +3035,11 @@ function maybeShowCondOverlay(){
 function showCondOverlay(){
   _condOverlayVal = 0;
   const now = new Date();
-  const dayNames = ["일","월","화","수","목","금","토"];
-  document.getElementById("condOverlayDateLabel").textContent =
-    `${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일 (${dayNames[now.getDay()]})`;
+  const dayNamesKo = ["일","월","화","수","목","금","토"];
+  const dayNamesEn = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  document.getElementById("condOverlayDateLabel").textContent = currentLang==="ko"
+    ? `${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일 (${dayNamesKo[now.getDay()]})`
+    : now.toLocaleDateString("en-US", {weekday:"short", month:"short", day:"numeric", year:"numeric"});
   document.querySelectorAll("#condOverlayBtns .condBtn").forEach(b=> b.classList.remove("selected"));
   document.getElementById("condOverlayLabel").textContent = "";
   renderConditionGraph("condOverlayGraph");
@@ -2922,7 +3051,7 @@ function selectOverlayCond(val){
   document.querySelectorAll("#condOverlayBtns .condBtn").forEach(b=>{
     b.classList.toggle("selected", +b.dataset.val === val);
   });
-  document.getElementById("condOverlayLabel").textContent = COND_EMOJI[val] + " " + COND_LABEL[val];
+  document.getElementById("condOverlayLabel").textContent = COND_EMOJI[val] + " " + condLabel(val);
 }
 
 function closeCondOverlay(confirm){
@@ -2948,16 +3077,17 @@ function renderCondTracker(){
   const entries = getCondEntries(today);
   const el = document.getElementById("condTrackerEntries");
 
+  const _u = t();
   if(entries.length === 0){
-    el.innerHTML = `<div class="condNoEntry">오늘 기록된 컨디션이 없어요</div>`;
+    el.innerHTML = `<div class="condNoEntry">${_u.condNoEntry}</div>`;
   } else {
     el.innerHTML = entries.map((e,i)=>{
-      const timeStr = e.time ? `${e.time} 기록` : "시간 미기록";
+      const timeStr = e.time ? `${e.time} ${_u.condTimeRecorded}` : _u.condTimeUnknown;
       return `<div class="condEntryCard">
         <span class="condEntryEmoji">${COND_EMOJI[e.val]||""}</span>
         <div class="condEntryInfo">
-          <div class="condEntryLabel">${COND_LABEL[e.val]||""}</div>
-          <div class="condEntryTime">${timeStr}${entries.length>1 ? ` · ${i+1}번째` : ""}</div>
+          <div class="condEntryLabel">${condLabel(e.val)}</div>
+          <div class="condEntryTime">${timeStr}${entries.length>1 ? ` · ${_u.condNth(i+1)}` : ""}</div>
         </div>
       </div>`;
     }).join("");
@@ -2979,7 +3109,7 @@ function selectTrackerCond(val){
   document.querySelectorAll("#condTrackerBtns .condBtn").forEach(b=>{
     b.classList.toggle("selected", +b.dataset.val === val);
   });
-  document.getElementById("condTrackerLabel").textContent = COND_EMOJI[val] + " " + COND_LABEL[val];
+  document.getElementById("condTrackerLabel").textContent = COND_EMOJI[val] + " " + condLabel(val);
   document.getElementById("condTrackerSaveBtn").style.display = "block";
 }
 
@@ -2987,7 +3117,7 @@ function saveTrackerCond(){
   if(!_condTrackerVal) return;
   addConditionEntry(_condTrackerVal);
   renderCondTracker();
-  showToast("컨디션 기록됨!");
+  showToast(t().condTrackerToast);
 }
 
 // 그래프 공통 (svgId 지정 가능 — 오버레이/트래커 모달 양쪽 사용)
