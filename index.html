@@ -385,7 +385,7 @@
       <button class="condBtn" data-val="5" onclick="selectOverlayCond(5)">💪</button>
     </div>
     <div class="condSelectedLabel" id="condOverlayLabel"></div>
-    <svg id="condOverlayGraph" width="100%" height="40" style="margin-top:12px; display:block;"></svg>
+    <svg id="condOverlayGraph" width="100%" height="65" style="margin-top:12px; display:block;"></svg>
     <div class="condOverlayActions">
       <button class="condSkipBtn" id="condOverlaySkipBtnEl" onclick="closeCondOverlay(false)">건너뛰기</button>
       <button class="condConfirmBtn" id="condOverlayConfirmBtnEl" onclick="closeCondOverlay(true)">확인</button>
@@ -400,7 +400,7 @@
     <div id="condTrackerEntries"></div>
     <div class="condTrackerGraphWrap">
       <div class="condTrackerGraphTitle" id="condTrackerGraphTitleEl">최근 14일</div>
-      <svg id="condTrackerGraph" width="100%" height="46" style="display:block;"></svg>
+      <svg id="condTrackerGraph" width="100%" height="85" style="display:block;"></svg>
     </div>
     <div class="condTrackerDivider" id="condTrackerDividerEl">+ 지금 컨디션 추가</div>
     <div class="conditionBtns" id="condTrackerBtns">
@@ -3204,6 +3204,7 @@ function renderConditionGraph(svgId){
   const svg = document.getElementById(svgId || "condOverlayGraph");
   if(!svg) return;
   const H = parseFloat(svg.getAttribute("height")) || 40;
+  const showDates = H >= 60; // 날짜 레이블: 충분한 높이일 때만
   const days = [];
   const now = new Date();
   for(let i=13;i>=0;i--){
@@ -3211,32 +3212,69 @@ function renderConditionGraph(svgId){
     const k = d.toISOString().slice(0,10);
     const entries = getCondEntries(k);
     const val = entries.length > 0 ? entries[entries.length-1].val : 0; // 하루 마지막 기록 기준
-    days.push({key:k, val});
+    days.push({key:k, val, dayOfWeek:d.getDay()});
   }
   const hasAny = days.some(d=>d.val>0);
   if(!hasAny){ svg.innerHTML=""; return; }
   const W = svg.getBoundingClientRect().width || 280;
-  const padL=6, padR=6, padT=4, padB=4;
+  const padL=6, padR=6, padT=6;
+  const padB = showDates ? 22 : 5;
   const n = days.length;
   const xOf = i => padL + (i/(n-1)) * (W-padL-padR);
   const yOf = v => H - padB - (v/5) * (H-padT-padB);
+
+  // 가이드라인 (수평 미세 점선 — 눈금 역할)
+  let guidelines = "";
+  for(let lv=1;lv<=5;lv++){
+    const gy = yOf(lv);
+    guidelines += `<line x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2,3" opacity=".5"/>`;
+  }
+
   let pathD = "";
   days.forEach((d,i)=>{
     if(d.val===0) return;
     const x=xOf(i), y=yOf(d.val);
     if(!pathD) pathD=`M${x},${y}`; else pathD+=` L${x},${y}`;
   });
+
+  // 점 + 이모지 레이블
+  const COND_EMJ = {1:"😫",2:"😞",3:"😐",4:"😊",5:"💪"};
   let dots = "";
   days.forEach((d,i)=>{
     if(d.val===0) return;
-    dots += `<circle cx="${xOf(i)}" cy="${yOf(d.val)}" r="3.5" fill="var(--accent)" opacity=".9"/>`;
+    const cx=xOf(i), cy=yOf(d.val);
+    dots += `<circle cx="${cx}" cy="${cy}" r="3.5" fill="var(--accent)" opacity=".9"/>`;
   });
   const todayIdx = days.findIndex(d=>d.key===todayDateKey());
   if(todayIdx>=0 && days[todayIdx].val>0){
-    dots += `<circle cx="${xOf(todayIdx)}" cy="${yOf(days[todayIdx].val)}" r="5.5" fill="none" stroke="var(--accent)" stroke-width="2"/>`;
+    const tx=xOf(todayIdx), ty=yOf(days[todayIdx].val);
+    dots += `<circle cx="${tx}" cy="${ty}" r="5.5" fill="none" stroke="var(--accent)" stroke-width="2"/>`;
   }
-  svg.innerHTML =
-    `<path d="${pathD}" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity=".6"/>` + dots;
+
+  // 날짜 레이블 (X축)
+  let dateLabels = "";
+  if(showDates){
+    // 매 2일마다 표시 + 첫날/오늘은 항상 표시
+    days.forEach((d,i)=>{
+      const isToday = d.key === todayDateKey();
+      const show = isToday || i===0 || (i % 2 === 0);
+      if(!show) return;
+      const parts = d.key.split('-');
+      const mon = parseInt(parts[1]);
+      const day = parseInt(parts[2]);
+      const label = isToday ? "오늘" : `${mon}/${day}`;
+      const x = xOf(i);
+      // 세로 구분선 (today만)
+      if(isToday){
+        dateLabels += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${H-padB}" stroke="var(--accent)" stroke-width="0.8" stroke-dasharray="3,3" opacity=".35"/>`;
+      }
+      dateLabels += `<text x="${x}" y="${H-5}" text-anchor="middle" font-size="9" fill="${isToday ? 'var(--accent)' : 'var(--muted)'}" font-weight="${isToday ? '700' : '400'}">${label}</text>`;
+    });
+  }
+
+  svg.innerHTML = guidelines +
+    `<path d="${pathD}" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/>` +
+    dots + dateLabels;
 }
 
 /* ===================== 서비스워커 (백그라운드 타이머 알림) ===================== */
