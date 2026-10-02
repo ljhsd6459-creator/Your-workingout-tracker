@@ -1468,6 +1468,12 @@ function syncDoneLength(st){
   while(w.length < st.sets) w.push("");
   while(w.length > st.sets) w.pop();
   st.weights = w;
+
+  if(!st.rir) st.rir = [];
+  const rv = st.rir;
+  while(rv.length < st.sets) rv.push(null);
+  while(rv.length > st.sets) rv.pop();
+  st.rir = rv;
 }
 
 /* ===================== 커스텀 추가 ===================== */
@@ -1743,6 +1749,7 @@ function renderCounter(){
         st.done.splice(i, 1);
         st.reps.splice(i, 1);
         st.weights.splice(i, 1);
+        if(st.rir) st.rir.splice(i, 1);
         st.sets--;
         saveToday(); renderCounter();
       };
@@ -2010,7 +2017,10 @@ function saveJournalToHistory(){
     }catch(e){}
   }catch(e){}
   const history = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY) || "[]");
-  const dateKey = todayDateKey();
+  const dateKey = getJournalDate ? getJournalDate() : todayDateKey();
+  // upsert: remove existing entry for this date, then add updated one
+  const existingIdx = history.findIndex(h => h.date === dateKey);
+  if(existingIdx >= 0) history.splice(existingIdx, 1);
   history.unshift({date:dateKey, text});
   localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(history.slice(0,3650)));
   renderHistory();
@@ -3295,12 +3305,12 @@ function showRIRPopup(rir, setIdx, st){
   pop.id = 'rirPopupEl';
   pop.className = 'rirPopup';
   pop.style.borderColor = a.color;
-  pop.innerHTML = \`
+  pop.innerHTML = `
     <button class="rirPopClose" onclick="document.getElementById('rirPopupEl')?.remove();clearTimeout(window._rirTimer);">×</button>
-    <div class="rirPopHead" style="color:\${a.color};">\${a.emoji} RIR \${rir===5?'5+':rir} · \${a.label} <span style="font-weight:400;font-size:11px;color:var(--muted);">\${a.setInfo}</span></div>
-    <div class="rirPopBody">\${a.main}</div>
-    <div class="rirPopSrc">📚 \${a.source}</div>
-    <div class="rirPopProgress"><div class="rirPopProgressBar" id="rirProgBar" style="width:100%;transition:width \${DISMISS_MS}ms linear;"></div></div>\`;
+    <div class="rirPopHead" style="color:${a.color};">${a.emoji} RIR ${rir===5?'5+':rir} · ${a.label} <span style="font-weight:400;font-size:11px;color:var(--muted);">${a.setInfo}</span></div>
+    <div class="rirPopBody">${a.main}</div>
+    <div class="rirPopSrc">📚 ${a.source}</div>
+    <div class="rirPopProgress"><div class="rirPopProgressBar" id="rirProgBar" style="width:100%;transition:width ${DISMISS_MS}ms linear;"></div></div>`;
   document.body.appendChild(pop);
 
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
