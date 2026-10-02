@@ -822,7 +822,18 @@ const UI = {
     condTimeRecorded:"기록", condTimeUnknown:"시간 미기록",
     condNth:(n)=>`${n}번째`,
     condTrackerToast:"컨디션 기록됨!",
-    searchEmpty:"검색 결과 없음"
+    searchEmpty:"검색 결과 없음",
+    noPastEntry:"해당 날짜의 기록이 없습니다.",
+    todayLabel:"오늘",
+    toastRunUpdated:"러닝 기록이 수정되었습니다.",
+    runUpdateBtn:"✅ 수정 저장",
+    toastRunEditMode:"수정 모드: 내용 변경 후 저장하세요.",
+    notifRestTitle:t().notifRestTitle,
+    notifRestBody:t().notifRestBody,
+    rirSetLabel:(n,t)=>`${n}세트`,
+    rirSetInfo:(n,t,last)=>`세트 ${n}/${t}${last?" (마지막)":""}`,
+    rirSummaryHeader:"💪 RIR 강도 기록",
+    condDateFmt:(y,mo,d,day)=>`${y}년 ${mo}월 ${d}일 (${day})`
   },
   en: {
     appTitle:"🏋️ GymBuddy", langBtn:"한국어",
@@ -900,7 +911,18 @@ const UI = {
     condTimeRecorded:"recorded", condTimeUnknown:"No time recorded",
     condNth:(n)=>`#${n}`,
     condTrackerToast:"Condition saved!",
-    searchEmpty:"No results found"
+    searchEmpty:"No results found",
+    noPastEntry:"No entry for this date.",
+    todayLabel:"Today",
+    toastRunUpdated:"Running record updated.",
+    runUpdateBtn:"✅ Save Edit",
+    toastRunEditMode:"Edit mode: change details then save.",
+    notifRestTitle:"⏰ Rest time over!",
+    notifRestBody:"Time to start the next set 💪",
+    rirSetLabel:(n,t)=>`Set ${n}`,
+    rirSetInfo:(n,t,last)=>`Set ${n}/${t}${last?" (last)":""}`,
+    rirSummaryHeader:"💪 RIR Intensity Log",
+    condDateFmt:(y,mo,d,day)=>`${day}, ${["January","February","March","April","May","June","July","August","September","October","November","December"][mo-1]} ${d}, ${y}`
   }
 };
 function t(){ return UI[currentLang] || UI.ko; }
@@ -1047,7 +1069,7 @@ function checkAndResetForNewDay(){
       area.placeholder = '';
     } else {
       area.value = '';
-      if(dateKey !== todayDateKey()) area.placeholder = '해당 날짜의 기록이 없습니다.';
+      if(dateKey !== todayDateKey()) area.placeholder = t().noPastEntry;
       else generateJournal();
     }
   }
@@ -1656,17 +1678,17 @@ function renderCounter(){
       const rirVal = (st.rir && st.rir[i] !== undefined) ? st.rir[i] : null;
       const rirHtml = d ? `<div class="rirRow">
         <span class="rirLabel">RIR</span>
-        ${[0,1,2,3,4,5].map(n=>`<button class="rirBtn rir${n}${rirVal===n?' selected':''}" data-act="setRIR" data-i="${i}" data-rir="${n}" title="${n===0?'완전실패':n===5?'매우 쉬움':n+'개 더 할 수 있음'}">${n===5?'5+':n}</button>`).join('')}
+        ${[0,1,2,3,4,5].map(n=>`<button class="rirBtn rir${n}${rirVal===n?' selected':''}" data-act="setRIR" data-i="${i}" data-rir="${n}" title="${currentLang==='ko'?(n===0?'완전실패':n===5?'매우 쉬움':n+'개 더 할 수 있음'):(n===0?'Failure':n===5?'Very easy':n+' reps left')}">${n===5?'5+':n}</button>`).join('')}
       </div>` : '';
       return `
       <div class="setRow" data-i="${i}">
         <button class="setDoneBtn ${d?'done':''}" data-act="toggleDone" data-i="${i}">${d?'✓':i+1}</button>
         <div class="repsStepper">
-          <span class="repsValue tapToEdit" data-i="${i}" title="탭해서 수정">${reps}</span>
+          <span class="repsValue tapToEdit" data-i="${i}" title="${currentLang==='ko'?'탭해서 수정':'Tap to edit'}">${reps}</span>
           <span class="repsUnit">${u.repsUnit}</span>
         </div>
         <input type="number" inputmode="decimal" step="0.5" class="setWeightInput" data-i="${i}" placeholder="${st.unit}" aria-label="${u.weightPh} (${st.unit})" value="${weightVal}">
-        ${st.sets > 1 ? `<button class="setDelBtn" data-act="delSet" data-i="${i}" title="이 세트 삭제">−</button>` : ''}
+        ${st.sets > 1 ? `<button class="setDelBtn" data-act="delSet" data-i="${i}" title="${currentLang==='ko'?'이 세트 삭제':'Remove set'}">−</button>` : ''}
       </div>${rirHtml}`;
     }).join("");
     card.innerHTML = `
@@ -1962,7 +1984,7 @@ function generateJournal(){
       const setDetails = s.rir.map((rv,i)=>{
         if(rv===null || rv===undefined) return null;
         const a = getRIRAdvice(rv, i+1, s.sets);
-        return `${i+1}세트 RIR${rv>=5?"5+":rv}(${a.label})`;
+        return `${t().rirSetLabel(i+1,s.sets)} RIR${rv>=5?"5+":rv}(${a.label})`;
       }).filter(Boolean);
       if(setDetails.length > 0){
         rirSummaryLines.push(`  - ${nm}: ${setDetails.join(" → ")}`);
@@ -1970,7 +1992,7 @@ function generateJournal(){
     });
     if(rirSummaryLines.length > 0){
       lines.push("");
-      lines.push(currentLang==="ko" ? "💪 RIR 강도 기록" : "💪 RIR Intensity Log");
+      lines.push(t().rirSummaryHeader);
       rirSummaryLines.forEach(l=>lines.push(l));
     }
   }catch(e){}
@@ -2066,7 +2088,7 @@ function renderHistory(){
   const searchQ = searchEl ? searchEl.value.trim().toLowerCase() : "";
   let history = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY) || "[]");
   if(searchQ) history = history.filter(h=>(h.text||"").toLowerCase().includes(searchQ) || (h.date||"").includes(searchQ));
-  if(history.length===0){ list.innerHTML = `<div class="empty">${searchQ ? "검색 결과 없음" : t().historyEmpty}</div>`; return; }
+  if(history.length===0){ list.innerHTML = `<div class="empty">${searchQ ? t().searchEmpty : t().historyEmpty}</div>`; return; }
   list.innerHTML = "";
   history.forEach((h,idx)=>{
     const div = document.createElement("div");
@@ -2161,7 +2183,7 @@ function renderCalendar(){
       area.placeholder = '';
     } else {
       area.value = '';
-      area.placeholder = '해당 날짜의 기록이 없습니다.';
+      area.placeholder = t().noPastEntry;
     }
     area.scrollIntoView({behavior:'smooth', block:'center'});
   });
@@ -2649,7 +2671,7 @@ function saveRunEntry(){
     editingRunIdx = -1;
     const saveBtn = document.querySelector('button[onclick="saveRunEntry()"]');
     if(saveBtn){ saveBtn.textContent = u.runSaveBtn || '💾 저장'; saveBtn.style.background = ''; }
-    showToast('러닝 기록이 수정되었습니다.');
+    showToast(t().toastRunUpdated);
   } else {
     runs.unshift(newEntry);
     showToast(u.toastRunSaved);
@@ -2711,10 +2733,10 @@ function editRunEntry(index){
   document.getElementById("runCadenceInput").value = r.cadence || '';
   // 저장 버튼 텍스트 변경
   const saveBtn = document.querySelector('button[onclick="saveRunEntry()"]');
-  if(saveBtn){ saveBtn.textContent = '✅ 수정 저장'; saveBtn.style.background = 'var(--accent2)'; }
+  if(saveBtn){ saveBtn.textContent = t().runUpdateBtn; saveBtn.style.background = 'var(--accent2)'; }
   // 폼으로 스크롤
   document.getElementById("runDateInput").scrollIntoView({behavior:'smooth', block:'center'});
-  showToast('수정 모드: 내용 변경 후 저장하세요.');
+  showToast(t().toastRunEditMode);
 }
 
 function cancelRunEdit(){
@@ -3287,40 +3309,90 @@ function saveTrackerCond(){
 // ── RIR 피드백 시스템 ──────────────────────────────────────────────────────
 function getRIRAdvice(rir, setNum, totalSets){
   const last = setNum === totalSets;
+  const ko = currentLang === "ko";
   const advice = {
-    0:{emoji:"🔥",label:"완전 실패",color:"#e05c5c",
-      main: last
-        ? "마지막 세트에서 완전 실패 — 최대 근육 자극 완료! 다음 세션에선 이 중량으로 1-2렙 추가를 목표로 하세요."
-        : `${setNum}/${totalSets}세트에서 실패했어요. 다음 세트 전 3-5분 휴식 후 중량 5-10% 감량을 권장합니다. 세트 간 강도 일관성이 근비대의 핵심입니다.`,
-      source:"Schoenfeld et al. (2021), J Strength Cond Res — 실패 훈련과 근비대 효과"},
-    1:{emoji:"💪",label:"근비대 최적",color:"var(--accent)",
-      main: last
-        ? "RIR 1 — 근비대와 근력 향상의 최적 구간에서 마무리! 다음 세션에서 +2.5kg 또는 +1렙에 도전해보세요."
-        : "이상적인 강도! 중량을 유지하고 다음 세트도 이 강도를 목표로 하세요. 피로 누적에 따라 RIR이 자연히 줄어드는 게 정상입니다.",
-      source:"Zourdos et al. (2016), J Strength Cond Res — RIR 기반 자기조절 훈련"},
-    2:{emoji:"✅",label:"이상적 구간",color:"var(--accent)",
-      main: last
-        ? "RIR 2 — 근비대 훈련의 이상적인 완료 구간. 다음 세션에서 +2.5kg을 시도하거나 세트 수를 1개 추가해보세요."
-        : "좋은 강도! 다음 세트에서 중량을 미세하게 +1-2.5kg 시도 가능. 점진적 과부하는 소폭씩 꾸준히가 핵심입니다.",
-      source:"Schoenfeld & Grgic (2019), Strength Cond J — 근비대 반복수 범위 연구"},
-    3:{emoji:"📈",label:"여력 있음",color:"#f59e0b",
-      main: last
-        ? "마지막 세트에 여력이 남았어요. 다음 세션에서 +5kg 또는 +2-3렙 시도를 권장합니다. 근비대엔 RIR 0-3이 효과적입니다."
-        : "아직 충분히 밀어붙일 수 있어요! 다음 세트에서 중량 +2.5-5kg을 올리거나 같은 중량으로 렙수를 더 짜내보세요.",
-      source:"Helms et al. (2016), Sports Med — 훈련 강도 자기조절 가이드라인"},
-    4:{emoji:"⚠️",label:"강도 부족",color:"#9aa3af",
-      main: last
-        ? "강도가 다소 낮았어요. 근비대를 위해 RIR 0-3 범위가 권장됩니다. 다음 세션에서 중량을 5-10% 올려보세요."
-        : "다음 세트에서 중량을 5-10% 올리거나 렙수를 3-5개 추가하세요. 근육은 충분한 자극이 있어야 성장합니다.",
-      source:"Krieger (2010), J Strength Cond Res — 세트 수·강도와 근비대 메타분석"},
-    5:{emoji:"😴",label:"워밍업 수준",color:"#9aa3af",
-      main: last
-        ? "이 중량은 너무 가볍습니다. 다음 세션에서 중량을 10-20% 대폭 올리세요. 근육은 자극 없이 성장하지 않아요."
-        : "지금 바로 중량을 10-20% 올리세요! RIR 5 이상은 신경계 활성화조차 미흡한 수준입니다.",
+    0:{emoji:"🔥",
+      label: ko ? "완전 실패" : "Failure",
+      color:"#e05c5c",
+      main: ko
+        ? (last
+            ? "마지막 세트에서 완전 실패 — 최대 근육 자극 완료! 다음 세션에선 이 중량으로 1-2렙 추가를 목표로 하세요."
+            : `${setNum}/${totalSets}세트에서 실패했어요. 다음 세트 전 3-5분 휴식 후 중량 5-10% 감량을 권장합니다. 세트 간 강도 일관성이 근비대의 핵심입니다.`)
+        : (last
+            ? "Hit failure on the last set — maximum stimulus achieved! Next session aim for 1-2 more reps at the same weight."
+            : `Failed on set ${setNum}/${totalSets}. Rest 3-5 min then reduce load by 5-10%. Consistent intensity across sets is key for hypertrophy.`),
+      source: ko
+        ? "Schoenfeld et al. (2021), J Strength Cond Res — 실패 훈련과 근비대 효과"
+        : "Schoenfeld et al. (2021), J Strength Cond Res — Training to failure and hypertrophy"},
+    1:{emoji:"💪",
+      label: ko ? "근비대 최적" : "Hypertrophy Zone",
+      color:"var(--accent)",
+      main: ko
+        ? (last
+            ? "RIR 1 — 근비대와 근력 향상의 최적 구간에서 마무리! 다음 세션에서 +2.5kg 또는 +1렙에 도전해보세요."
+            : "이상적인 강도! 중량을 유지하고 다음 세트도 이 강도를 목표로 하세요. 피로 누적에 따라 RIR이 자연히 줄어드는 게 정상입니다.")
+        : (last
+            ? "RIR 1 — Finished in the prime hypertrophy zone! Try +2.5 kg or +1 rep next session."
+            : "Ideal intensity! Keep the load and aim for the same effort next set. A natural RIR drop across sets is normal as fatigue builds."),
+      source: ko
+        ? "Zourdos et al. (2016), J Strength Cond Res — RIR 기반 자기조절 훈련"
+        : "Zourdos et al. (2016), J Strength Cond Res — Autoregulation via RIR"},
+    2:{emoji:"✅",
+      label: ko ? "이상적 구간" : "Ideal Range",
+      color:"var(--accent)",
+      main: ko
+        ? (last
+            ? "RIR 2 — 근비대 훈련의 이상적인 완료 구간. 다음 세션에서 +2.5kg을 시도하거나 세트 수를 1개 추가해보세요."
+            : "좋은 강도! 다음 세트에서 중량을 미세하게 +1-2.5kg 시도 가능. 점진적 과부하는 소폭씩 꾸준히가 핵심입니다.")
+        : (last
+            ? "RIR 2 — Great finishing point for hypertrophy. Try +2.5 kg or add a set next session."
+            : "Good intensity! You can try nudging the load +1-2.5 kg next set. Small, consistent progressive overload is the key."),
+      source: ko
+        ? "Schoenfeld & Grgic (2019), Strength Cond J — 근비대 반복수 범위 연구"
+        : "Schoenfeld & Grgic (2019), Strength Cond J — Rep ranges for hypertrophy"},
+    3:{emoji:"📈",
+      label: ko ? "여력 있음" : "Room to Push",
+      color:"#f59e0b",
+      main: ko
+        ? (last
+            ? "마지막 세트에 여력이 남았어요. 다음 세션에서 +5kg 또는 +2-3렙 시도를 권장합니다. 근비대엔 RIR 0-3이 효과적입니다."
+            : "아직 충분히 밀어붙일 수 있어요! 다음 세트에서 중량 +2.5-5kg을 올리거나 같은 중량으로 렙수를 더 짜내보세요.")
+        : (last
+            ? "You had more left in the tank. Try +5 kg or +2-3 reps next session. RIR 0-3 is the sweet spot for hypertrophy."
+            : "You can push harder! Try +2.5-5 kg next set, or squeeze out more reps at the same weight."),
+      source: ko
+        ? "Helms et al. (2016), Sports Med — 훈련 강도 자기조절 가이드라인"
+        : "Helms et al. (2016), Sports Med — Autoregulation guidelines for training intensity"},
+    4:{emoji:"⚠️",
+      label: ko ? "강도 부족" : "Too Light",
+      color:"#9aa3af",
+      main: ko
+        ? (last
+            ? "강도가 다소 낮았어요. 근비대를 위해 RIR 0-3 범위가 권장됩니다. 다음 세션에서 중량을 5-10% 올려보세요."
+            : "다음 세트에서 중량을 5-10% 올리거나 렙수를 3-5개 추가하세요. 근육은 충분한 자극이 있어야 성장합니다.")
+        : (last
+            ? "Intensity was a bit low. For hypertrophy, aim for RIR 0-3. Try +5-10% load next session."
+            : "Increase the load by 5-10% or add 3-5 reps next set. Muscles need sufficient stimulus to grow."),
+      source: ko
+        ? "Krieger (2010), J Strength Cond Res — 세트 수·강도와 근비대 메타분석"
+        : "Krieger (2010), J Strength Cond Res — Sets, intensity & hypertrophy meta-analysis"},
+    5:{emoji:"😴",
+      label: ko ? "워밍업 수준" : "Warm-up Only",
+      color:"#9aa3af",
+      main: ko
+        ? (last
+            ? "이 중량은 너무 가볍습니다. 다음 세션에서 중량을 10-20% 대폭 올리세요. 근육은 자극 없이 성장하지 않아요."
+            : "지금 바로 중량을 10-20% 올리세요! RIR 5 이상은 신경계 활성화조차 미흡한 수준입니다.")
+        : (last
+            ? "Way too light. Increase the load by 10-20% next session. Muscles won't grow without challenge."
+            : "Increase the load by 10-20% right now! RIR 5+ doesn't even activate your nervous system properly."),
       source:"ACSM Guidelines for Exercise Testing & Prescription (2022)"}
   };
   const a = advice[Math.min(rir,5)];
-  return {...a, setInfo:`세트 ${setNum}/${totalSets}${last?" (마지막)":""}`};
+  const setInfo = ko
+    ? `세트 ${setNum}/${totalSets}${last?" (마지막)":""}`
+    : `Set ${setNum}/${totalSets}${last?" (last)":""}`;
+  return {...a, setInfo};
 }
 
 function showRIRPopup(rir, setIdx, st){
@@ -3420,7 +3492,7 @@ function renderConditionGraph(svgId){
       const parts = d.key.split('-');
       const mon = parseInt(parts[1]);
       const day = parseInt(parts[2]);
-      const label = isToday ? "오늘" : `${mon}/${day}`;
+      const label = isToday ? t().todayLabel : `${mon}/${day}`;
       const x = xOf(i);
       // 세로 구분선 (today만)
       if(isToday){
