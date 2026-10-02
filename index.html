@@ -1897,7 +1897,13 @@ function generateJournal(){
         const weightVal = (s.weights && s.weights[i]!==undefined && s.weights[i]!==null && String(s.weights[i]).trim()!=="") ? s.weights[i] : "";
         const weightStr = weightVal!=="" ? ` ${weightVal}${s.unit||"kg"}` : "";
         const repsStr = reps!=="" ? `${reps}${u.repsUnit}` : "";
-        lines.push(`  ${i+1}${u.sets}: ${repsStr}${weightStr} ${d ? "✅" : "⬜"}`);
+        const rirVal = (s.rir && s.rir[i] !== undefined && s.rir[i] !== null) ? s.rir[i] : null;
+        let rirStr = "";
+        if(rirVal !== null){
+          const rirA = getRIRAdvice(rirVal, i+1, s.sets);
+          rirStr = `  │ RIR ${rirVal>=5?"5+":rirVal} ${rirA.emoji} ${rirA.label}`;
+        }
+        lines.push(`  ${i+1}${u.sets}: ${repsStr}${weightStr} ${d ? "✅" : "⬜"}${rirStr}`);
       });
     });
     lines.push("");
@@ -1940,6 +1946,32 @@ function generateJournal(){
       lines.push(currentLang==="ko" ? "📊 볼륨 (무게 × 횟수)" : "📊 Volume (weight × reps)");
       volLines.forEach(l=>lines.push(l));
       lines.push((currentLang==="ko" ? "  합계: " : "  Total: ") + Math.round(totalVol).toLocaleString() + (u.weightUnit||"kg"));
+    }
+  }catch(e){}
+
+  // RIR 요약 섹션 — RIR 데이터가 하나라도 있을 때만 출력
+  try{
+    const rirSummaryLines = [];
+    entries.forEach(id=>{
+      const s = todayState[id];
+      if(!s.rir) return;
+      const hasRir = s.rir.some(v=>v!==null && v!==undefined);
+      if(!hasRir) return;
+      const ex = findExerciseById(s.cat, id);
+      const nm = ex ? getDisplayName(ex) : s.name;
+      const setDetails = s.rir.map((rv,i)=>{
+        if(rv===null || rv===undefined) return null;
+        const a = getRIRAdvice(rv, i+1, s.sets);
+        return `${i+1}세트 RIR${rv>=5?"5+":rv}(${a.label})`;
+      }).filter(Boolean);
+      if(setDetails.length > 0){
+        rirSummaryLines.push(`  - ${nm}: ${setDetails.join(" → ")}`);
+      }
+    });
+    if(rirSummaryLines.length > 0){
+      lines.push("");
+      lines.push(currentLang==="ko" ? "💪 RIR 강도 기록" : "💪 RIR Intensity Log");
+      rirSummaryLines.forEach(l=>lines.push(l));
     }
   }catch(e){}
 
