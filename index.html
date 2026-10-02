@@ -127,6 +127,24 @@
   /* 세트별 행 (reps stepper + per-set weight) */
   .setRows{display:flex; flex-direction:column; gap:8px;}
   .setRow{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .rirRow{display:flex;align-items:center;gap:5px;padding:4px 2px 2px 6px;width:100%;flex-wrap:wrap;}
+  .rirLabel{font-size:11px;color:var(--muted);white-space:nowrap;font-weight:600;letter-spacing:.3px;}
+  .rirBtn{background:var(--card2);border:1.5px solid var(--border);color:var(--muted);border-radius:7px;width:30px;height:26px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;line-height:1;}
+  .rirBtn:hover{border-color:var(--accent);color:var(--accent);}
+  .rirBtn.selected{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .rirBtn.rir0{}.rirBtn.rir0.selected{background:#e05c5c;border-color:#e05c5c;}
+  .rirBtn.rir1.selected,.rirBtn.rir2.selected{background:var(--accent);}
+  .rirBtn.rir3.selected{background:#f59e0b;border-color:#f59e0b;}
+  .rirBtn.rir4.selected,.rirBtn.rir5.selected{background:var(--muted);border-color:var(--muted);}
+  /* RIR 팝업 */
+  .rirPopup{position:fixed;bottom:76px;left:50%;transform:translateX(-50%);max-width:330px;width:92%;background:var(--card);border:1.5px solid var(--accent);border-radius:16px;padding:14px 16px 12px;z-index:9999;box-shadow:0 8px 36px rgba(0,0,0,.45);animation:rirPop .22s cubic-bezier(.34,1.4,.64,1);}
+  @keyframes rirPop{from{opacity:0;transform:translateX(-50%) translateY(14px) scale(.95)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
+  .rirPopHead{font-size:13px;font-weight:800;color:var(--accent);margin-bottom:6px;padding-right:22px;}
+  .rirPopBody{font-size:13px;color:var(--text);line-height:1.55;}
+  .rirPopSrc{font-size:10px;color:var(--muted);margin-top:8px;font-style:italic;}
+  .rirPopClose{position:absolute;top:9px;right:12px;font-size:18px;color:var(--muted);cursor:pointer;background:none;border:none;line-height:1;padding:0;}
+  .rirPopProgress{height:3px;border-radius:2px;background:var(--border);margin-top:10px;overflow:hidden;}
+  .rirPopProgressBar{height:100%;background:var(--accent);border-radius:2px;transition:width linear;}
   .counterHint{
     background:rgba(90,209,201,.12); border:1px solid var(--accent,#5ad1c9); color:var(--accent,#5ad1c9);
     border-radius:10px; padding:9px 12px; font-size:13px; font-weight:600; text-align:center; margin-bottom:10px;
@@ -1400,6 +1418,7 @@ function renderExerciseList(){
     if(todayState[id].unit===undefined) todayState[id].unit = "kg";
     if(!todayState[id].reps) todayState[id].reps = Array.from({length:todayState[id].sets}, ()=>10);
     if(!todayState[id].weights) todayState[id].weights = Array.from({length:todayState[id].sets}, ()=> todayState[id].weight || "");
+    if(!todayState[id].rir) todayState[id].rir = Array.from({length:todayState[id].sets}, ()=>null);
     const st = todayState[id];
     st.name = ex.name;
     const tipText = getDisplayTip(ex);
@@ -1608,7 +1627,13 @@ function renderCounter(){
     document.getElementById("counterTapHint").textContent = u.counterTapHint;
   }
   let prevSession = {};
-  try{ prevSession = JSON.parse(localStorage.getItem(STORAGE_KEY_EX_HISTORY) || "{}"); }catch(e){}
+  try{
+    const _raw = JSON.parse(localStorage.getItem(STORAGE_KEY_EX_HISTORY) || "{}");
+    const _today = todayDateKey();
+    // 오늘 날짜 항목은 제외 — autoSaveExHistory가 실시간 저장하므로
+    // 오늘 데이터를 "지난번 기록"으로 표시하지 않음
+    Object.keys(_raw).forEach(k=>{ if(_raw[k].date !== _today) prevSession[k] = _raw[k]; });
+  }catch(e){}
 
   entries.forEach(id=>{
     const st = todayState[id];
@@ -1622,6 +1647,11 @@ function renderCounter(){
     const rowsHtml = st.done.map((d,i)=>{
       const reps = st.reps[i];
       const weightVal = (st.weights[i]!==undefined && st.weights[i]!==null) ? st.weights[i] : "";
+      const rirVal = (st.rir && st.rir[i] !== undefined) ? st.rir[i] : null;
+      const rirHtml = d ? `<div class="rirRow">
+        <span class="rirLabel">RIR</span>
+        ${[0,1,2,3,4,5].map(n=>`<button class="rirBtn rir${n}${rirVal===n?' selected':''}" data-act="setRIR" data-i="${i}" data-rir="${n}" title="${n===0?'완전실패':n===5?'매우 쉬움':n+'개 더 할 수 있음'}">${n===5?'5+':n}</button>`).join('')}
+      </div>` : '';
       return `
       <div class="setRow" data-i="${i}">
         <button class="setDoneBtn ${d?'done':''}" data-act="toggleDone" data-i="${i}">${d?'✓':i+1}</button>
@@ -1631,7 +1661,7 @@ function renderCounter(){
         </div>
         <input type="number" inputmode="decimal" step="0.5" class="setWeightInput" data-i="${i}" placeholder="${st.unit}" aria-label="${u.weightPh} (${st.unit})" value="${weightVal}">
         ${st.sets > 1 ? `<button class="setDelBtn" data-act="delSet" data-i="${i}" title="이 세트 삭제">−</button>` : ''}
-      </div>`;
+      </div>${rirHtml}`;
     }).join("");
     card.innerHTML = `
       <div class="ctop">
@@ -1675,6 +1705,19 @@ function renderCounter(){
       };
     });
     // reps 탭해서 직접 입력
+    // RIR 버튼 핸들러
+    card.querySelectorAll('[data-act="setRIR"]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const i = +btn.dataset.i;
+        const rirVal = +btn.dataset.rir;
+        if(!st.rir) st.rir = Array.from({length:st.sets}, ()=>null);
+        st.rir[i] = rirVal;
+        saveToday();
+        showRIRPopup(rirVal, i, st);
+        renderCounter();
+      };
+    });
+
     card.querySelectorAll('.repsValue.tapToEdit').forEach(span=>{
       span.onclick = ()=>{
         const i = +span.dataset.i;
@@ -3198,6 +3241,79 @@ function saveTrackerCond(){
   renderCondTracker();
   showToast(t().condTrackerToast);
 }
+
+// ── RIR 피드백 시스템 ──────────────────────────────────────────────────────
+function getRIRAdvice(rir, setNum, totalSets){
+  const last = setNum === totalSets;
+  const advice = {
+    0:{emoji:"🔥",label:"완전 실패",color:"#e05c5c",
+      main: last
+        ? "마지막 세트에서 완전 실패 — 최대 근육 자극 완료! 다음 세션에선 이 중량으로 1-2렙 추가를 목표로 하세요."
+        : `${setNum}/${totalSets}세트에서 실패했어요. 다음 세트 전 3-5분 휴식 후 중량 5-10% 감량을 권장합니다. 세트 간 강도 일관성이 근비대의 핵심입니다.`,
+      source:"Schoenfeld et al. (2021), J Strength Cond Res — 실패 훈련과 근비대 효과"},
+    1:{emoji:"💪",label:"근비대 최적",color:"var(--accent)",
+      main: last
+        ? "RIR 1 — 근비대와 근력 향상의 최적 구간에서 마무리! 다음 세션에서 +2.5kg 또는 +1렙에 도전해보세요."
+        : "이상적인 강도! 중량을 유지하고 다음 세트도 이 강도를 목표로 하세요. 피로 누적에 따라 RIR이 자연히 줄어드는 게 정상입니다.",
+      source:"Zourdos et al. (2016), J Strength Cond Res — RIR 기반 자기조절 훈련"},
+    2:{emoji:"✅",label:"이상적 구간",color:"var(--accent)",
+      main: last
+        ? "RIR 2 — 근비대 훈련의 이상적인 완료 구간. 다음 세션에서 +2.5kg을 시도하거나 세트 수를 1개 추가해보세요."
+        : "좋은 강도! 다음 세트에서 중량을 미세하게 +1-2.5kg 시도 가능. 점진적 과부하는 소폭씩 꾸준히가 핵심입니다.",
+      source:"Schoenfeld & Grgic (2019), Strength Cond J — 근비대 반복수 범위 연구"},
+    3:{emoji:"📈",label:"여력 있음",color:"#f59e0b",
+      main: last
+        ? "마지막 세트에 여력이 남았어요. 다음 세션에서 +5kg 또는 +2-3렙 시도를 권장합니다. 근비대엔 RIR 0-3이 효과적입니다."
+        : "아직 충분히 밀어붙일 수 있어요! 다음 세트에서 중량 +2.5-5kg을 올리거나 같은 중량으로 렙수를 더 짜내보세요.",
+      source:"Helms et al. (2016), Sports Med — 훈련 강도 자기조절 가이드라인"},
+    4:{emoji:"⚠️",label:"강도 부족",color:"#9aa3af",
+      main: last
+        ? "강도가 다소 낮았어요. 근비대를 위해 RIR 0-3 범위가 권장됩니다. 다음 세션에서 중량을 5-10% 올려보세요."
+        : "다음 세트에서 중량을 5-10% 올리거나 렙수를 3-5개 추가하세요. 근육은 충분한 자극이 있어야 성장합니다.",
+      source:"Krieger (2010), J Strength Cond Res — 세트 수·강도와 근비대 메타분석"},
+    5:{emoji:"😴",label:"워밍업 수준",color:"#9aa3af",
+      main: last
+        ? "이 중량은 너무 가볍습니다. 다음 세션에서 중량을 10-20% 대폭 올리세요. 근육은 자극 없이 성장하지 않아요."
+        : "지금 바로 중량을 10-20% 올리세요! RIR 5 이상은 신경계 활성화조차 미흡한 수준입니다.",
+      source:"ACSM Guidelines for Exercise Testing & Prescription (2022)"}
+  };
+  const a = advice[Math.min(rir,5)];
+  return {...a, setInfo:`세트 ${setNum}/${totalSets}${last?" (마지막)":""}`};
+}
+
+function showRIRPopup(rir, setIdx, st){
+  const existing = document.getElementById('rirPopupEl');
+  if(existing) existing.remove();
+  clearTimeout(window._rirTimer);
+
+  const totalSets = st.sets;
+  const setNum = setIdx + 1;
+  const a = getRIRAdvice(rir, setNum, totalSets);
+  const DISMISS_MS = 8000;
+
+  const pop = document.createElement('div');
+  pop.id = 'rirPopupEl';
+  pop.className = 'rirPopup';
+  pop.style.borderColor = a.color;
+  pop.innerHTML = \`
+    <button class="rirPopClose" onclick="document.getElementById('rirPopupEl')?.remove();clearTimeout(window._rirTimer);">×</button>
+    <div class="rirPopHead" style="color:\${a.color};">\${a.emoji} RIR \${rir===5?'5+':rir} · \${a.label} <span style="font-weight:400;font-size:11px;color:var(--muted);">\${a.setInfo}</span></div>
+    <div class="rirPopBody">\${a.main}</div>
+    <div class="rirPopSrc">📚 \${a.source}</div>
+    <div class="rirPopProgress"><div class="rirPopProgressBar" id="rirProgBar" style="width:100%;transition:width \${DISMISS_MS}ms linear;"></div></div>\`;
+  document.body.appendChild(pop);
+
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const bar = document.getElementById('rirProgBar');
+    if(bar) bar.style.width = '0%';
+  }));
+
+  window._rirTimer = setTimeout(()=>{
+    const p = document.getElementById('rirPopupEl');
+    if(p){ p.style.transition = 'opacity .3s'; p.style.opacity='0'; setTimeout(()=>p.remove(), 300); }
+  }, DISMISS_MS);
+}
+// ── RIR 피드백 끝 ─────────────────────────────────────────────────────────
 
 // 그래프 공통 (svgId 지정 가능 — 오버레이/트래커 모달 양쪽 사용)
 function renderConditionGraph(svgId){
