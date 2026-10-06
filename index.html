@@ -438,6 +438,7 @@
   <div class="headerTop">
     <h1 id="appTitle" onclick="openTitleEdit()" style="cursor:pointer;">🏋️ GymBuddy</h1>
     <div style="display:flex; gap:6px;">
+      <button id="gistStatusDot" class="langToggle" onclick="openGistSetup()" title="클라우드 백업 미설정" style="font-size:16px;padding:4px 8px;">☁️</button>
       <button id="feedbackBtn" class="langToggle" onclick="openFeedback()" title="피드백 보내기">💬</button>
       <button id="langToggle" class="langToggle" onclick="toggleLang()">EN</button>
     </div>
@@ -1021,6 +1022,9 @@ const STORAGE_KEY_WORKOUT_TIMER = "wt_workout_timer_v1";
 const STORAGE_KEY_EX_HISTORY = "wt_exHistory_v1"; // 운동별 마지막 기록 (per-exercise, not per-session)
 const STORAGE_KEY_VOLUME    = "wt_volume_v1";    // 날짜별 볼륨·운동시간 기록
 const STORAGE_KEY_CONDITION = "wt_condition_v1"; // 날짜별 컨디션 (1~5)
+const GIST_TOKEN_KEY  = "wt_gist_token_v1";
+const GIST_ID_KEY     = "wt_gist_id_v1";
+const GIST_SYNC_KEY   = "wt_gist_sync_v1"; // 마지막 성공 sync timestamp
 const STORAGE_KEY_BUILTIN_SNAPSHOT = "wt_builtin_snapshot_v1"; // 내장 운동 스냅샷 (export 복원용)
 const STORAGE_KEY_COUNTER_ORDER = "wt_counter_order_v1"; // 카운터 탭 운동 순서
 
@@ -2191,7 +2195,7 @@ function renderCalendar(){
 
 /* ===================== 러닝 ===================== */
 function loadRuns(){ return JSON.parse(localStorage.getItem(STORAGE_KEY_RUNS) || "[]"); }
-function saveRuns(arr){ localStorage.setItem(STORAGE_KEY_RUNS, JSON.stringify(arr.slice(0,3650))); }
+function saveRuns(arr){ localStorage.setItem(STORAGE_KEY_RUNS, JSON.stringify(arr.slice(0,3650))); scheduleGistSave(); }
 let editingRunIdx = -1; // 수정 중인 러닝 기록 인덱스 (-1 = 신규 등록)
 
 let tesseractLoadingPromise = null;
@@ -3518,6 +3522,134 @@ async function registerSW(){
 }
 registerSW();
 
+/* ===================== GitHub Gist 자동 클라우드 백업 ===================== */
+const GIST_FILENAME = "gymbuddy-backup.json";
+let _gistSaveTimer = null;
+let _gistSaving = false;
+
+function gistToken(){ return localStorage.getItem(GIST_TOKEN_KEY) || ""; }
+function gistId(){ return localStorage.getItem(GIST_ID_KEY) || ""; }
+
+function scheduleGistSave(){
+  if(!gistToken()) return;
+  clearTimeout(_gistSaveTimer);
+  _gistSaveTimer = setTimeout(()=> gistSave(false), 4000); // 4초 디바운스
+}
+
+async function gistSave(showResult=true){
+  const token = gistToken();
+  if(!token || _gistSaving) return;
+  _gistSaving = true;
+  setGistStatus("syncing");
+
+  const data = {};
+  BACKUP_KEYS.forEach(k=>{ const v=localStorage.getItem(k); if(v!==null) data[k]=v; });
+  data._ts = Date.now(); // 저장 시각 기록
+  const body = JSON.stringify({ files:{ [GIST_FILENAME]:{ content: JSON.stringify(data,null,2) } } });
+  const headers = { "Authorization":"token "+token, "Content-Type":"application/json" };
+
+  try{
+    let res, gist;
+    const id = gistId();
+    if(id){
+      res = await fetch("https://api.github.com/gists/"+id, { method:"PATCH", headers, body });
+    } else {
+      res = await fetch("https://api.github.com/gists", { method:"POST", headers,
+        body: JSON.stringify({ description:"GymBuddy Backup", public:false,
+          files:{ [GIST_FILENAME]:{ content: JSON.stringify(data,null,2) } } }) });
+    }
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    gist = await res.json();
+    if(!id) localStorage.setItem(GIST_ID_KEY, gist.id);
+    localStorage.setItem(GIST_SYNC_KEY, String(Date.now()));
+    setGistStatus("ok");
+    if(showResult) showToast(currentLang==="ko"?"☁️ 클라우드에 저장됐어요":"☁️ Saved to cloud");
+  } catch(e){
+    setGistStatus("err");
+    if(showResult) showToast(currentLang==="ko"?"☁️ 클라우드 저장 실패":"☁️ Cloud save failed");
+  } finally { _gistSaving = false; }
+}
+
+async function gistLoad(){
+  const token = gistToken();
+  const id = gistId();
+  if(!token || !id) return null;
+  try{
+    const res = await fetch("https://api.github.com/gists/"+id, { headers:{"Authorization":"token "+token} });
+    if(!res.ok) return null;
+    const gist = await res.json();
+    const content = gist.files[GIST_FILENAME]?.content;
+    return content ? JSON.parse(content) : null;
+  } catch(e){ return null; }
+}
+
+async function gistCheckOnStart(){
+  if(!gistToken() || !gistId()) return;
+  setGistStatus("syncing");
+  const cloud = await gistLoad();
+  if(!cloud) { setGistStatus("err"); return; }
+  const cloudTs  = parseInt(cloud._ts  || 0);
+  const localTs  = parseInt(localStorage.getItem(GIST_SYNC_KEY) || 0);
+  if(cloudTs > localTs + 5000){ // 클라우드가 5초 이상 더 최신
+    const msg = currentLang==="ko"
+      ? "☁️ 클라우드에 더 최신 데이터가 있어요. 복구할까요?"
+      : "☁️ Cloud has newer data. Restore it?";
+    if(confirm(msg)){
+      BACKUP_KEYS.forEach(k=>{ if(cloud[k]!=null) localStorage.setItem(k, cloud[k]); });
+      localStorage.setItem(GIST_SYNC_KEY, String(cloudTs));
+      showToast(currentLang==="ko"?"☁️ 복구 완료! 새로고침할게요":"☁️ Restored! Reloading");
+      setTimeout(()=>location.reload(), 800);
+      return;
+    }
+  }
+  setGistStatus("ok");
+  // 로컬이 더 최신이면 클라우드에 밀어넣기
+  if(localTs < Date.now() - 60000) gistSave(false);
+}
+
+function setGistStatus(s){ // "ok" | "syncing" | "err" | "off"
+  const el = document.getElementById("gistStatusDot");
+  if(!el) return;
+  const map = { ok:"☁️✅", syncing:"☁️🔄", err:"☁️❌", off:"☁️" };
+  el.textContent = map[s] || "☁️";
+  el.title = { ok:"클라우드 동기화 완료", syncing:"저장 중...", err:"동기화 실패 — 설정 확인", off:"클라우드 백업 미설정" }[s] || "";
+}
+
+function openGistSetup(){
+  document.getElementById("gistSetupModal").style.display="flex";
+  document.getElementById("gistTokenInput").value = gistToken();
+}
+function closeGistSetup(){ document.getElementById("gistSetupModal").style.display="none"; }
+
+async function saveGistSetup(){
+  const tok = document.getElementById("gistTokenInput").value.trim();
+  if(!tok){ showToast(currentLang==="ko"?"토큰을 입력해주세요":"Enter a token"); return; }
+  localStorage.setItem(GIST_TOKEN_KEY, tok);
+  localStorage.removeItem(GIST_ID_KEY); // reset so new gist is created
+  closeGistSetup();
+  await gistSave(true);
+}
+
+async function gistRestoreNow(){
+  if(!gistToken()||!gistId()){ showToast(currentLang==="ko"?"먼저 설정을 완료해주세요":"Set up cloud sync first"); return; }
+  setGistStatus("syncing");
+  const cloud = await gistLoad();
+  if(!cloud){ showToast(currentLang==="ko"?"☁️ 불러오기 실패":"☁️ Restore failed"); setGistStatus("err"); return; }
+  BACKUP_KEYS.forEach(k=>{ if(cloud[k]!=null) localStorage.setItem(k, cloud[k]); });
+  localStorage.setItem(GIST_SYNC_KEY, String(cloud._ts||Date.now()));
+  showToast(currentLang==="ko"?"☁️ 복구 완료! 새로고침할게요":"☁️ Restored! Reloading");
+  setTimeout(()=>location.reload(), 800);
+}
+
+function disconnectGist(){
+  if(!confirm(currentLang==="ko"?"클라우드 연결을 해제할까요? (데이터는 유지됩니다)":"Disconnect cloud sync? (data is kept)")) return;
+  localStorage.removeItem(GIST_TOKEN_KEY);
+  localStorage.removeItem(GIST_ID_KEY);
+  setGistStatus("off");
+  closeGistSetup();
+  showToast(currentLang==="ko"?"☁️ 연결 해제됐어요":"☁️ Disconnected");
+}
+
 function exportBackup(){
   try{
     const data = {};
@@ -3612,7 +3744,41 @@ renderRunCalendar();
 initWorkoutTimerUI();
 maybeShowCondOverlay();
 if(didResetForNewDay){ showToast(t().toastNewDay); }
+
+// 클라우드 백업 초기화 (설정된 경우에만)
+if(gistToken()){
+  setGistStatus("syncing");
+  setTimeout(()=> gistCheckOnStart(), 1500); // 앱 렌더링 완료 후 체크
+} else {
+  setGistStatus("off");
+}
 </script>
 <script data-goatcounter="https://ljhsd6459.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+
+<!-- ☁️ Gist 설정 모달 -->
+<div id="gistSetupModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10001;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--card);border-radius:18px;padding:22px 20px;max-width:360px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.5);">
+    <h3 style="margin:0 0 6px;font-size:17px;">☁️ GitHub 자동 클라우드 백업</h3>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.5;">운동할 때마다 자동으로 GitHub에 저장돼요.<br>데이터를 잃어도 언제든 복구 가능해요.</p>
+    
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600;">GitHub Personal Access Token</div>
+    <input id="gistTokenInput" type="password" placeholder="ghp_xxxxxxxxxxxx"
+      style="width:100%;box-sizing:border-box;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;margin-bottom:12px;"/>
+    
+    <div style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.6;">
+      📌 토큰 만드는 법:<br>
+      github.com → 우측 상단 프로필 → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token<br>
+      <strong>Gist</strong> 권한만 체크하고 생성하세요.
+    </div>
+    
+    <button onclick="saveGistSetup()" style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:12px;font-size:15px;font-weight:700;margin-bottom:8px;cursor:pointer;">🔗 연결하기</button>
+    <div style="display:flex;gap:8px;">
+      <button onclick="gistRestoreNow()" style="flex:1;background:var(--card2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">☁️ 클라우드에서 복구</button>
+      <button onclick="disconnectGist()" style="flex:1;background:var(--card2);color:#e05c5c;border:1px solid var(--border);border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">🔌 연결 해제</button>
+    </div>
+    <button onclick="closeGistSetup()" style="width:100%;margin-top:8px;background:transparent;border:none;color:var(--muted);font-size:13px;padding:8px;cursor:pointer;">닫기</button>
+  </div>
+</div>
+
 </body>
 </html>
