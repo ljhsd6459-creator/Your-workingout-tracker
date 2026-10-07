@@ -1038,6 +1038,7 @@ function loadToday(){
 function saveToday(){
   localStorage.setItem(STORAGE_KEY_TODAY, JSON.stringify(todayState));
   localStorage.setItem(STORAGE_KEY_TODAY_DATE, todayDateKey());
+  if(typeof scheduleGistSave === "function") scheduleGistSave();
 }
 function todayDateKey(){
   const d = new Date();
@@ -2086,6 +2087,7 @@ function saveJournalToHistory(){
   renderHistory();
   renderCalendar();
   showToast(t().toastSaved);
+  if(typeof gistSave === "function") gistSave(false);
 }
 
 function renderHistory(){
