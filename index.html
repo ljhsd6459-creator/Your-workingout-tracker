@@ -2026,7 +2026,7 @@ function saveJournalToHistory(){
         const doneIdxs = (s.done || []).map((d,i)=>d?i:-1).filter(i=>i>=0);
         const idxs = doneIdxs.length > 0 ? doneIdxs : [...Array(s.sets).keys()];
         exHistory[id] = {
-          date: todayDateKey(),
+          date: getJournalDate(),
           sets: idxs.length,
           reps: idxs.map(i=> (s.reps && s.reps[i]!=null) ? s.reps[i] : 10),
           weights: idxs.map(i=> (s.weights && s.weights[i]!=null && s.weights[i]!=="") ? s.weights[i] : ""),
@@ -2071,7 +2071,8 @@ function saveJournalToHistory(){
       });
       const workoutMs = (typeof currentWorkoutElapsedMs==="function") ? currentWorkoutElapsedMs() : 0;
       const volData = JSON.parse(localStorage.getItem(STORAGE_KEY_VOLUME)||"{}");
-      volData[todayDateKey()] = { volume: Math.round(totalVolume), workoutMs, byExercise, restByEx };
+      const _volDateKey = getJournalDate();
+      volData[_volDateKey] = { volume: Math.round(totalVolume), workoutMs, byExercise, restByEx };
       localStorage.setItem(STORAGE_KEY_VOLUME, JSON.stringify(volData));
     }catch(e){}
   }catch(e){}
