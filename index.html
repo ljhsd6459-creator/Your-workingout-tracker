@@ -1046,6 +1046,32 @@ function todayDateKey(){
   const day = String(d.getDate()).padStart(2,"0");
   return `${y}-${m}-${day}`; // 기기의 로컬 시간 기준 (자정에 날짜가 바뀜)
 }
+// ── 일지 날짜 선택기 (전역) ──────────────────────────────────────────────────────
+function getJournalDate(){
+  const picker = document.getElementById('journalDatePicker');
+  if(picker && picker.value) return picker.value;
+  return todayDateKey();
+}
+function onJournalDateChange(){
+  const dateKey = getJournalDate();
+  const histArr = JSON.parse(localStorage.getItem('wt_history_v1')||'[]');
+  const entry = histArr.find(h=>h.date===dateKey);
+  const area = document.getElementById('journalOutput');
+  if(!area) return;
+  if(entry){
+    area.value = entry.text;
+    area.placeholder = '';
+  } else {
+    area.value = '';
+    if(dateKey !== todayDateKey()) area.placeholder = t().noPastEntry;
+    else generateJournal();
+  }
+}
+function initJournalDatePicker(){
+  const picker = document.getElementById('journalDatePicker');
+  if(picker) picker.value = todayDateKey();
+}
+
 function checkAndResetForNewDay(){
   const savedDate = localStorage.getItem(STORAGE_KEY_TODAY_DATE);
   const todayKey = todayDateKey();
@@ -1054,32 +1080,6 @@ function checkAndResetForNewDay(){
     todayState = {};
     localStorage.setItem(STORAGE_KEY_TODAY, JSON.stringify(todayState));
     didResetForNewDay = true;
-  }
-
-  // ── 일지 날짜 선택기 ──────────────────────────────────────────────────────
-  function getJournalDate(){
-    const picker = document.getElementById('journalDatePicker');
-    if(picker && picker.value) return picker.value;
-    return todayDateKey();
-  }
-  function onJournalDateChange(){
-    const dateKey = getJournalDate();
-    const histArr = JSON.parse(localStorage.getItem('wt_history_v1')||'[]');
-    const entry = histArr.find(h=>h.date===dateKey);
-    const area = document.getElementById('journalOutput');
-    if(!area) return;
-    if(entry){
-      area.value = entry.text;
-      area.placeholder = '';
-    } else {
-      area.value = '';
-      if(dateKey !== todayDateKey()) area.placeholder = t().noPastEntry;
-      else generateJournal();
-    }
-  }
-  function initJournalDatePicker(){
-    const picker = document.getElementById('journalDatePicker');
-    if(picker) picker.value = todayDateKey();
   }
   localStorage.setItem(STORAGE_KEY_TODAY_DATE, todayKey);
 }
@@ -1898,7 +1898,8 @@ function generateJournal(){
     document.getElementById("journalOutput").value = u.journalNoSelection;
     return;
   }
-  const dateStr = new Date().toLocaleDateString(u.dateLocale, {year:'numeric',month:'long',day:'numeric',weekday:'long'});
+  const _journalDateKey = getJournalDate();
+  const dateStr = new Date(_journalDateKey + "T00:00:00").toLocaleDateString(u.dateLocale, {year:'numeric',month:'long',day:'numeric',weekday:'long'});
   const byCat = {};
   entries.forEach(id=>{
     const s = todayState[id];
@@ -2075,7 +2076,7 @@ function saveJournalToHistory(){
     }catch(e){}
   }catch(e){}
   const history = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY) || "[]");
-  const dateKey = getJournalDate ? getJournalDate() : todayDateKey();
+  const dateKey = getJournalDate();
   // upsert: remove existing entry for this date, then add updated one
   const existingIdx = history.findIndex(h => h.date === dateKey);
   if(existingIdx >= 0) history.splice(existingIdx, 1);
