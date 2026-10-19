@@ -1945,9 +1945,6 @@ function generateJournal(){
     const secs = totalSec%60;
     lines.push(u.journalDuration(mins, secs));
   }
-  lines.push("");
-  lines.push(`${u.journalCheckpointPrefix} ${getDisplayNote()}`);
-
   // 볼륨 계산 및 추가
   try{
     let totalVol = 0;
