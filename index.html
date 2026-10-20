@@ -353,6 +353,30 @@
   .condTrackerDivider{ font-size:11px; color:var(--muted); margin:14px 0 8px; letter-spacing:.3px; text-transform:uppercase; }
   .condTrackerGraphWrap{ background:var(--card2); border-radius:10px; padding:10px 12px 8px; margin:12px 0 10px; }
   .condTrackerGraphTitle{ font-size:11px; color:var(--muted); margin-bottom:6px; }
+  /* 바이탈 4종 선택기 */
+  .vitalsGrid{ display:flex; flex-direction:column; gap:10px; margin:4px 0 10px; }
+  .vitalRow{ display:flex; align-items:center; gap:6px; }
+  .vitalRowLabel{ font-size:12px; color:var(--muted); width:54px; flex-shrink:0; display:flex; align-items:center; gap:3px; }
+  .vitalInfoBtn{ background:none; border:none; font-size:12px; cursor:pointer; padding:0 2px; opacity:.6; }
+  .vitalBtns{ display:flex; gap:4px; flex:1; justify-content:space-between; }
+  .vitalBtn{ flex:1; height:36px; border-radius:8px; border:2px solid transparent;
+    background:var(--card2); font-size:18px; cursor:pointer; transition:all .15s;
+    display:flex; align-items:center; justify-content:center; min-width:0; }
+  .vitalBtn.selected{ border-color:var(--accent); background:rgba(74,222,128,.18); transform:scale(1.1); }
+  /* 바이탈 배지 (지난기록) */
+  .vitalsBadgeRow{ display:flex; gap:5px; flex-wrap:wrap; margin-top:4px; }
+  .vitalBadge{ font-size:11px; background:var(--card2); border-radius:5px;
+    padding:2px 6px; color:var(--text); display:flex; align-items:center; gap:2px; }
+  /* 바이탈 인포 팝업 */
+  .vitalInfoPopup{ position:fixed; inset:0; z-index:9900; background:rgba(0,0,0,.55);
+    display:none; align-items:center; justify-content:center; padding:24px; }
+  .vitalInfoPopup.show{ display:flex; }
+  .vitalInfoCard{ background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:22px 20px; max-width:320px; width:100%; }
+  .vitalInfoTitle{ font-size:17px; font-weight:700; margin-bottom:10px; }
+  .vitalInfoBody{ font-size:14px; color:var(--text); line-height:1.6; margin-bottom:16px; }
+  .vitalInfoClose{ width:100%; padding:10px; border-radius:8px; border:none;
+    background:var(--accent); color:#06201e; font-weight:700; font-size:14px; cursor:pointer; }
   /* 검색창 */
   .searchWrap{ position:relative; margin-bottom:8px; }
   .searchWrap input{
@@ -394,19 +418,12 @@
 <div id="condOverlay">
   <div id="condOverlayCard">
     <div class="condOverlayDate" id="condOverlayDateLabel"></div>
-    <div class="condOverlayTitle" id="condOverlayTitleEl">오늘 컨디션이 어때요? 💪</div>
-    <div class="conditionBtns" id="condOverlayBtns">
-      <button class="condBtn" data-val="1" onclick="selectOverlayCond(1)">😫</button>
-      <button class="condBtn" data-val="2" onclick="selectOverlayCond(2)">😔</button>
-      <button class="condBtn" data-val="3" onclick="selectOverlayCond(3)">😐</button>
-      <button class="condBtn" data-val="4" onclick="selectOverlayCond(4)">😊</button>
-      <button class="condBtn" data-val="5" onclick="selectOverlayCond(5)">💪</button>
-    </div>
-    <div class="condSelectedLabel" id="condOverlayLabel"></div>
-    <svg id="condOverlayGraph" width="100%" height="65" style="margin-top:12px; display:block;"></svg>
+    <div class="condOverlayTitle" id="condOverlayTitleEl">오늘 상태 체크 💪</div>
+    <div class="vitalsGrid" id="overlayVitalsGrid"></div>
+    <svg id="condOverlayGraph" width="100%" height="55" style="margin-top:4px; display:block;"></svg>
     <div class="condOverlayActions">
       <button class="condSkipBtn" id="condOverlaySkipBtnEl" onclick="closeCondOverlay(false)">건너뛰기</button>
-      <button class="condConfirmBtn" id="condOverlayConfirmBtnEl" onclick="closeCondOverlay(true)">확인</button>
+      <button class="condConfirmBtn" id="condOverlayConfirmBtnEl" onclick="closeCondOverlay(true)">저장</button>
     </div>
   </div>
 </div>
@@ -414,23 +431,25 @@
 <!-- 컨디션 트래킹 모달 -->
 <div class="modal-overlay" id="condTrackerOverlay">
   <div class="modal" style="max-width:360px;">
-    <h4 id="condTrackerTitleEl">📊 컨디션 트래킹</h4>
+    <h4 id="condTrackerTitleEl">📊 오늘 상태 기록</h4>
     <div id="condTrackerEntries"></div>
     <div class="condTrackerGraphWrap">
-      <div class="condTrackerGraphTitle" id="condTrackerGraphTitleEl">최근 14일</div>
-      <svg id="condTrackerGraph" width="100%" height="85" style="display:block;"></svg>
+      <div class="condTrackerGraphTitle" id="condTrackerGraphTitleEl">최근 14일 컨디션</div>
+      <svg id="condTrackerGraph" width="100%" height="75" style="display:block;"></svg>
     </div>
-    <div class="condTrackerDivider" id="condTrackerDividerEl">+ 지금 컨디션 추가</div>
-    <div class="conditionBtns" id="condTrackerBtns">
-      <button class="condBtn" data-val="1" onclick="selectTrackerCond(1)">😫</button>
-      <button class="condBtn" data-val="2" onclick="selectTrackerCond(2)">😔</button>
-      <button class="condBtn" data-val="3" onclick="selectTrackerCond(3)">😐</button>
-      <button class="condBtn" data-val="4" onclick="selectTrackerCond(4)">😊</button>
-      <button class="condBtn" data-val="5" onclick="selectTrackerCond(5)">💪</button>
-    </div>
-    <div class="condSelectedLabel" id="condTrackerLabel"></div>
+    <div class="condTrackerDivider" id="condTrackerDividerEl">+ 지금 상태 기록</div>
+    <div class="vitalsGrid" id="trackerVitalsGrid"></div>
     <button id="condTrackerSaveBtn" onclick="saveTrackerCond()" style="width:100%;margin-top:10px;padding:10px;border-radius:8px;border:none;background:var(--accent);color:#06201e;font-weight:700;display:none;">지금 시간으로 저장</button>
     <button onclick="closeCondTracker()" class="modalClose" id="condTrackerCloseBtnEl" style="width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-weight:700;">닫기</button>
+  </div>
+</div>
+
+<!-- 바이탈 인포 팝업 -->
+<div class="vitalInfoPopup" id="vitalInfoPopup">
+  <div class="vitalInfoCard">
+    <div class="vitalInfoTitle" id="vitalInfoTitle"></div>
+    <div class="vitalInfoBody" id="vitalInfoBody"></div>
+    <button class="vitalInfoClose" onclick="closeVitalInfo()">확인</button>
   </div>
 </div>
 
@@ -1975,6 +1994,28 @@ function generateJournal(){
     }
   }catch(e){}
 
+  // 바이탈 섹션 — 저장된 바이탈이 있을 때만 포함
+  try{
+    const _jVitals = getVitals(_journalDateKey);
+    if(_jVitals){
+      const ko = currentLang === "ko";
+      const vitalsLines = [];
+      VITALS_CONFIG.forEach(cfg=>{
+        const val = _jVitals[cfg.key];
+        if(!val) return;
+        const label = ko ? cfg.ko : cfg.en;
+        const emoji = cfg.emojis[val] || "";
+        const desc = ko ? cfg.labelsKo[val] : cfg.labelsEn[val];
+        vitalsLines.push(`  ${cfg.icon} ${label}: ${emoji} ${desc} (${val}/5)`);
+      });
+      if(vitalsLines.length > 0){
+        lines.push("");
+        lines.push(ko ? "💊 오늘의 상태" : "💊 Today's Status");
+        vitalsLines.forEach(l=>lines.push(l));
+      }
+    }
+  }catch(e){}
+
   // RIR 요약 섹션 — RIR 데이터가 하나라도 있을 때만 출력
   try{
     const rirSummaryLines = [];
@@ -2101,12 +2142,17 @@ function renderHistory(){
     const div = document.createElement("div");
     div.className = "historyitem";
     let _volBadge = "";
+    let _vitalsBadge = "";
     try{
       const _vd = JSON.parse(localStorage.getItem(STORAGE_KEY_VOLUME)||"{}");
       const _dv = _vd[h.date];
       if(_dv && _dv.volume > 0) _volBadge = `<span class="volumeBadge">${_dv.volume.toLocaleString()}kg</span>`;
     }catch(e){}
-    div.innerHTML = `<div class="hrow"><div class="hdate">${h.date}${_volBadge}</div><button class="hDeleteBtn" data-idx="${idx}">🗑</button></div><div>${h.text.split("\n")[0]}</div>`;
+    try{
+      const vitals = getVitals(h.date);
+      if(vitals) _vitalsBadge = buildVitalsBadgeHTML(vitals);
+    }catch(e){}
+    div.innerHTML = `<div class="hrow"><div class="hdate">${h.date}${_volBadge}</div><button class="hDeleteBtn" data-idx="${idx}">🗑</button></div>${_vitalsBadge}<div>${h.text.split("\n")[0]}</div>`;
     div.onclick = (e)=>{
       if(e.target.classList.contains("hDeleteBtn")) return;
       document.getElementById("journalOutput").value = h.text; switchTab('tab-journal');
@@ -3192,6 +3238,115 @@ const COND_LABEL_KO = ["","최악","별로","보통","좋음","최고"];
 const COND_LABEL_EN = ["","Bad","Meh","OK","Good","Great"];
 function condLabel(v){ return (currentLang==="ko" ? COND_LABEL_KO : COND_LABEL_EN)[v] || ""; }
 
+// ── 바이탈 4종 시스템 ──────────────────────────────────────────────────────
+const STORAGE_KEY_VITALS = "wt_vitals_v1";
+const VITALS_CONFIG = [
+  { key:"cond",   icon:"⚡", ko:"컨디션", en:"Energy",
+    emojis:["","😫","😔","😐","😊","💪"],
+    labelsKo:["","최악","별로","보통","좋음","최고"],
+    labelsEn:["","Bad","Meh","OK","Good","Great"],
+    infoKo:null, infoEn:null },
+  { key:"bowel",  icon:"💩", ko:"변 상태", en:"Bowel",
+    emojis:["","😣","😟","😐","🙂","✨"],
+    labelsKo:["","설사","무름","보통","좋음","완벽"],
+    labelsEn:["","Loose","Soft","OK","Good","Perfect"],
+    infoKo:null, infoEn:null },
+  { key:"health", icon:"🏥", ko:"건강상태", en:"Health",
+    emojis:["","🤒","😷","😐","🙂","💪"],
+    labelsKo:["","아픔","미열","보통","좋음","완벽"],
+    labelsEn:["","Sick","Unwell","OK","Good","Great"],
+    infoKo:null, infoEn:null },
+  { key:"libido", icon:"🔥", ko:"성욕", en:"Libido",
+    emojis:["","❄️","😑","😐","😏","🔥"],
+    labelsKo:["","없음","낮음","보통","높음","최고"],
+    labelsEn:["","None","Low","OK","High","Peak"],
+    infoKo:"성욕은 테스토스테론 수치와 스트레스 지수를 직접 반영하는 건강 지표예요.\n\n낮을수록 → 스트레스 과부하 또는 오버트레이닝 신호일 수 있어요.\n높을수록 → 회복 상태 양호, 호르몬 균형 잘 유지 중.\n\n운동 강도·회복 조절의 중요한 바이오마커입니다 🧠",
+    infoEn:"Libido directly reflects testosterone levels and stress.\n\nLow = possible overtraining or high stress load.\nHigh = good recovery, healthy hormonal balance.\n\nA key biomarker for adjusting training intensity & recovery 🧠" },
+];
+
+function getVitals(dateKey){
+  try{
+    const v = JSON.parse(localStorage.getItem(STORAGE_KEY_VITALS)||"{}");
+    return v[dateKey] || null;
+  }catch(e){ return null; }
+}
+function saveVitals(dateKey, data){
+  try{
+    const v = JSON.parse(localStorage.getItem(STORAGE_KEY_VITALS)||"{}");
+    v[dateKey] = data;
+    localStorage.setItem(STORAGE_KEY_VITALS, JSON.stringify(v));
+    // 기존 컨디션 그래프와 호환: cond 값을 STORAGE_KEY_CONDITION에도 동기화
+    if(data.cond){
+      const cond = JSON.parse(localStorage.getItem(STORAGE_KEY_CONDITION)||"{}");
+      const now = new Date();
+      const time = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+      const existing = getCondEntries(dateKey);
+      if(existing.length === 0) { cond[dateKey] = [{val:data.cond, time}]; }
+      else { existing[existing.length-1].val = data.cond; cond[dateKey] = existing; }
+      localStorage.setItem(STORAGE_KEY_CONDITION, JSON.stringify(cond));
+    }
+    if(typeof scheduleGistSave==="function") scheduleGistSave();
+  }catch(e){}
+}
+
+// 바이탈 행 HTML 생성
+let _vitalsSelections = {};  // 현재 선택중인 값들 {cond, bowel, health, libido}
+function buildVitalsGridHTML(prefix, currentVals){
+  const ko = currentLang === "ko";
+  return VITALS_CONFIG.map(cfg=>{
+    const val = currentVals ? (currentVals[cfg.key]||0) : 0;
+    const hasInfo = ko ? cfg.infoKo : cfg.infoEn;
+    const label = ko ? cfg.ko : cfg.en;
+    const infoBtn = hasInfo ? `<button class="vitalInfoBtn" onclick="showVitalInfo('${cfg.key}')" title="설명">ℹ️</button>` : "";
+    const btns = [1,2,3,4,5].map(n=>`<button class="vitalBtn${val===n?' selected':''}" onclick="selectVital('${prefix}','${cfg.key}',${n})">${cfg.emojis[n]}</button>`).join("");
+    return `<div class="vitalRow" id="${prefix}-row-${cfg.key}">
+      <div class="vitalRowLabel">${cfg.icon} ${label}${infoBtn}</div>
+      <div class="vitalBtns" id="${prefix}-btns-${cfg.key}">${btns}</div>
+    </div>`;
+  }).join("");
+}
+
+function selectVital(prefix, key, val){
+  if(!_vitalsSelections[prefix]) _vitalsSelections[prefix] = {};
+  _vitalsSelections[prefix][key] = val;
+  // 버튼 selected 상태 갱신
+  const container = document.getElementById(`${prefix}-btns-${key}`);
+  if(container) container.querySelectorAll(".vitalBtn").forEach((b,i)=> b.classList.toggle("selected", i+1===val));
+  // 저장 버튼 표시 (tracker에서만)
+  if(prefix==="tracker"){
+    const hasAny = Object.values(_vitalsSelections["tracker"]||{}).some(v=>v>0);
+    const btn = document.getElementById("condTrackerSaveBtn");
+    if(btn) btn.style.display = hasAny ? "block" : "none";
+  }
+}
+
+function showVitalInfo(key){
+  const cfg = VITALS_CONFIG.find(c=>c.key===key);
+  if(!cfg) return;
+  const ko = currentLang === "ko";
+  const info = ko ? cfg.infoKo : cfg.infoEn;
+  if(!info) return;
+  document.getElementById("vitalInfoTitle").textContent = (ko ? cfg.ko : cfg.en) + " " + cfg.icon;
+  document.getElementById("vitalInfoBody").innerHTML = info.replace(/\n/g,"<br>");
+  document.getElementById("vitalInfoPopup").classList.add("show");
+}
+function closeVitalInfo(){
+  document.getElementById("vitalInfoPopup").classList.remove("show");
+}
+
+// 바이탈 뱃지 HTML (지난기록 표시용)
+function buildVitalsBadgeHTML(vitals){
+  if(!vitals) return "";
+  const ko = currentLang === "ko";
+  const parts = VITALS_CONFIG.map(cfg=>{
+    const val = vitals[cfg.key];
+    if(!val) return null;
+    return `<span class="vitalBadge" title="${ko?cfg.ko:cfg.en} ${val}/5">${cfg.icon}${cfg.emojis[val]}</span>`;
+  }).filter(Boolean);
+  if(!parts.length) return "";
+  return `<div class="vitalsBadgeRow">${parts.join("")}</div>`;
+}
+
 // 날짜별 컨디션 항목 읽기 (이전 데이터 {날짜:숫자} 호환)
 function getCondEntries(dateKey){
   const cond = JSON.parse(localStorage.getItem(STORAGE_KEY_CONDITION)||"{}");
@@ -3227,14 +3382,20 @@ function maybeShowCondOverlay(){
 
 function showCondOverlay(){
   _condOverlayVal = 0;
+  if(!_vitalsSelections["overlay"]) _vitalsSelections["overlay"] = {};
   const now = new Date();
+  const todayKey = todayDateKey();
   const dayNamesKo = ["일","월","화","수","목","금","토"];
   const dayNamesEn = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
   document.getElementById("condOverlayDateLabel").textContent = currentLang==="ko"
     ? `${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일 (${dayNamesKo[now.getDay()]})`
     : now.toLocaleDateString("en-US", {weekday:"short", month:"short", day:"numeric", year:"numeric"});
-  document.querySelectorAll("#condOverlayBtns .condBtn").forEach(b=> b.classList.remove("selected"));
-  document.getElementById("condOverlayLabel").textContent = "";
+  // 오늘 저장된 바이탈 불러오기 (재진입 시 복원)
+  const savedVitals = getVitals(todayKey);
+  _vitalsSelections["overlay"] = savedVitals ? {...savedVitals} : {};
+  // 바이탈 그리드 렌더
+  const grid = document.getElementById("overlayVitalsGrid");
+  if(grid) grid.innerHTML = buildVitalsGridHTML("overlay", _vitalsSelections["overlay"]);
   renderConditionGraph("condOverlayGraph");
   document.getElementById("condOverlay").style.display = "flex";
 }
@@ -3244,11 +3405,23 @@ function selectOverlayCond(val){
   document.querySelectorAll("#condOverlayBtns .condBtn").forEach(b=>{
     b.classList.toggle("selected", +b.dataset.val === val);
   });
-  document.getElementById("condOverlayLabel").textContent = COND_EMOJI[val] + " " + condLabel(val);
+  if(document.getElementById("condOverlayLabel"))
+    document.getElementById("condOverlayLabel").textContent = COND_EMOJI[val] + " " + condLabel(val);
 }
 
 function closeCondOverlay(confirm){
-  if(confirm && _condOverlayVal > 0) addConditionEntry(_condOverlayVal);
+  if(confirm){
+    const todayKey = todayDateKey();
+    const sel = _vitalsSelections["overlay"] || {};
+    const hasCond = sel.cond > 0;
+    const hasAny = Object.values(sel).some(v=>v>0);
+    if(hasAny){
+      saveVitals(todayKey, sel);
+      if(hasCond) addConditionEntry(sel.cond);
+    } else if(_condOverlayVal > 0){
+      addConditionEntry(_condOverlayVal);
+    }
+  }
   document.getElementById("condOverlay").style.display = "none";
 }
 
@@ -3271,8 +3444,16 @@ function renderCondTracker(){
   const el = document.getElementById("condTrackerEntries");
 
   const _u = t();
+  const ko = currentLang === "ko";
+  // 오늘 저장된 바이탈 뱃지 표시
+  const todayVitals = getVitals(today);
+  let vitalsHTML = "";
+  if(todayVitals){
+    vitalsHTML = buildVitalsBadgeHTML(todayVitals);
+  }
+
   if(entries.length === 0){
-    el.innerHTML = `<div class="condNoEntry">${_u.condNoEntry}</div>`;
+    el.innerHTML = `<div class="condNoEntry">${_u.condNoEntry}</div>${vitalsHTML}`;
   } else {
     el.innerHTML = entries.map((e,i)=>{
       const timeStr = e.time ? `${e.time} ${_u.condTimeRecorded}` : _u.condTimeUnknown;
@@ -3283,17 +3464,26 @@ function renderCondTracker(){
           <div class="condEntryTime">${timeStr}${entries.length>1 ? ` · ${_u.condNth(i+1)}` : ""}</div>
         </div>
       </div>`;
-    }).join("");
+    }).join("") + vitalsHTML;
   }
 
   // 14일 그래프
   document.getElementById("condTrackerGraph").innerHTML = "";
   renderConditionGraph("condTrackerGraph");
 
-  // 선택 초기화
+  // 바이탈 입력 그리드 (오늘 저장값 또는 빈 상태)
+  if(!_vitalsSelections["tracker"]) _vitalsSelections["tracker"] = {};
+  const savedV = getVitals(today);
+  _vitalsSelections["tracker"] = savedV ? {...savedV} : {};
+  const tGrid = document.getElementById("trackerVitalsGrid");
+  if(tGrid) tGrid.innerHTML = buildVitalsGridHTML("tracker", _vitalsSelections["tracker"]);
+
+  // 기존 컨디션 버튼 선택 초기화
   _condTrackerVal = 0;
-  document.querySelectorAll("#condTrackerBtns .condBtn").forEach(b=> b.classList.remove("selected"));
-  document.getElementById("condTrackerLabel").textContent = "";
+  const trackerBtns = document.querySelectorAll("#condTrackerBtns .condBtn");
+  if(trackerBtns.length) trackerBtns.forEach(b=> b.classList.remove("selected"));
+  const trackerLabel = document.getElementById("condTrackerLabel");
+  if(trackerLabel) trackerLabel.textContent = "";
   document.getElementById("condTrackerSaveBtn").style.display = "none";
 }
 
@@ -3302,13 +3492,23 @@ function selectTrackerCond(val){
   document.querySelectorAll("#condTrackerBtns .condBtn").forEach(b=>{
     b.classList.toggle("selected", +b.dataset.val === val);
   });
-  document.getElementById("condTrackerLabel").textContent = COND_EMOJI[val] + " " + condLabel(val);
+  const lbl = document.getElementById("condTrackerLabel");
+  if(lbl) lbl.textContent = COND_EMOJI[val] + " " + condLabel(val);
   document.getElementById("condTrackerSaveBtn").style.display = "block";
 }
 
 function saveTrackerCond(){
-  if(!_condTrackerVal) return;
-  addConditionEntry(_condTrackerVal);
+  const today = todayDateKey();
+  const sel = _vitalsSelections["tracker"] || {};
+  const hasAny = Object.values(sel).some(v=>v>0);
+  if(hasAny){
+    saveVitals(today, sel);
+    if(sel.cond > 0) addConditionEntry(sel.cond);
+  } else if(_condTrackerVal > 0){
+    addConditionEntry(_condTrackerVal);
+  } else {
+    return;
+  }
   renderCondTracker();
   showToast(t().condTrackerToast);
 }
