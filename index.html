@@ -3642,8 +3642,10 @@ function openRecoveryForDate(dateKey){
   document.getElementById("recoveryOverlay").classList.add("show");
 }
 function openCondTrackerForDate(dateKey){
-  // 바이탈 트래커 모달에서 특정 날짜 데이터 로드 (현재는 오늘만 지원, 탭 이동)
   switchTab("tab-journal");
+  // 날짜 피커가 있으면 해당 날짜로 맞춰줌
+  const dp = document.getElementById("journalDatePicker");
+  if(dp) dp.value = dateKey;
   openCondTracker();
 }
 function closeRecovery(){
@@ -4056,8 +4058,8 @@ function openHealthDetail(dateKey){
   if(!rows) rows=`<div style="text-align:center;padding:24px;color:var(--muted);font-size:13px;">${ko?"이 날은 기록이 없어요":"No data for this day"}</div>`;
   // 회복/컨디션 수정 버튼
   const editBtns=`<div style="display:flex;gap:8px;margin-top:12px;">
-    <button onclick="closeHealthDetail();setTimeout(()=>{openRecoveryForDate('${dateKey}')},200)" style="flex:1;padding:9px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);cursor:pointer;font-size:13px;">💧 ${ko?"회복 수정":"Edit Recovery"}</button>
-    <button onclick="closeHealthDetail();setTimeout(()=>{openCondTrackerForDate('${dateKey}')},200)" style="flex:1;padding:9px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);cursor:pointer;font-size:13px;">⚡ ${ko?"컨디션 수정":"Edit Vitals"}</button>
+    <button onclick="closeHealthDetail();closeHealthDash();setTimeout(()=>{openRecoveryForDate('${dateKey}')},250)" style="flex:1;padding:9px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);cursor:pointer;font-size:13px;">💧 ${ko?"회복 수정":"Edit Recovery"}</button>
+    <button onclick="closeHealthDetail();closeHealthDash();setTimeout(()=>{openCondTrackerForDate('${dateKey}')},250)" style="flex:1;padding:9px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);cursor:pointer;font-size:13px;">⚡ ${ko?"컨디션 수정":"Edit Vitals"}</button>
   </div>`;
   document.getElementById("healthDetailDate").textContent=dateStr;
   document.getElementById("healthDetailRows").innerHTML=rows+editBtns;
