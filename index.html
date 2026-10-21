@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GymBuddy">
+<meta name="theme-color" content="#0f1115">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230f1115'/%3E%3Ctext y='.9em' font-size='80'%3E🏋️%3C/text%3E%3C/svg%3E">
 <title>GymBuddy</title>
 <style>
   :root{
@@ -410,6 +416,109 @@
   .exMemoArea.open{ display:block; }
   /* 이전 메모 힌트 */
   .prevNoteHint{ margin-top:3px; font-size:11px; color:var(--accent2); opacity:.85; }
+
+  /* ── 건강 대시보드 ── */
+  .healthDashOverlay{ position:fixed; inset:0; z-index:9800; background:var(--bg); display:none; flex-direction:column; overflow:hidden; }
+  .healthDashOverlay.show{ display:flex; }
+  .healthDashHeader{ display:flex; align-items:center; justify-content:space-between; padding:16px 16px 10px; background:var(--bg); border-bottom:1px solid var(--border); flex-shrink:0; }
+  .healthDashTitle{ font-size:16px; font-weight:700; }
+  .healthDashClose{ background:none; border:none; font-size:22px; cursor:pointer; color:var(--muted); padding:2px 8px; border-radius:8px; }
+  .healthDashScroll{ flex:1; overflow-y:auto; padding:14px 14px 80px; }
+  .healthNavBar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .healthNavLabel{ font-size:13px; font-weight:700; }
+  .healthNavBtn{ background:var(--card2); border:none; border-radius:8px; padding:6px 13px; color:var(--text); cursor:pointer; font-size:15px; }
+  .healthNavBtn:disabled{ opacity:.3; cursor:default; }
+  /* Week strip */
+  .healthWeekStrip{ display:flex; gap:5px; margin-bottom:20px; }
+  .healthDayCard{ flex:1; min-width:0; background:var(--card2); border-radius:12px; padding:8px 3px 7px; text-align:center; border:1.5px solid transparent; cursor:pointer; transition:border-color .15s; }
+  .healthDayCard.today{ border-color:var(--accent); }
+  .healthDayCard.future{ opacity:.35; cursor:default; pointer-events:none; }
+  .healthDayName{ font-size:9px; color:var(--muted); font-weight:600; text-transform:uppercase; margin-bottom:2px; }
+  .healthDayNum{ font-size:13px; font-weight:800; margin-bottom:5px; }
+  .healthCondCircle{ width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:17px; margin:0 auto 4px; }
+  .healthCondCircle.c1{ background:rgba(239,68,68,.25); }
+  .healthCondCircle.c2{ background:rgba(251,146,60,.25); }
+  .healthCondCircle.c3{ background:rgba(250,204,21,.2); }
+  .healthCondCircle.c4{ background:rgba(74,222,128,.2); }
+  .healthCondCircle.c5{ background:rgba(74,222,128,.4); }
+  .healthCondCircle.empty{ background:var(--card); border:1.5px dashed var(--border); }
+  .healthVitalsMini{ font-size:9px; min-height:12px; line-height:1; margin-bottom:2px; }
+  .healthRecMini{ font-size:11px; min-height:13px; }
+  /* Month heatmap */
+  .healthMonthGridEl{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:18px; }
+  .healthMonthWeekday{ font-size:9px; color:var(--muted); text-align:center; padding:2px 0; font-weight:700; }
+  .healthMonthCell{ aspect-ratio:3/4; border-radius:7px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; background:var(--card2); border:1.5px solid transparent; font-size:10px; transition:border-color .1s; padding:2px 0; }
+  .healthMonthCell.today{ border-color:var(--accent) !important; }
+  .healthMonthCell.empty{ background:transparent; cursor:default; pointer-events:none; }
+  .healthMonthCell.future{ opacity:.3; cursor:default; pointer-events:none; }
+  .healthMonthCell.cond1{ background:rgba(239,68,68,.3); }
+  .healthMonthCell.cond2{ background:rgba(251,146,60,.3); }
+  .healthMonthCell.cond3{ background:rgba(250,204,21,.22); }
+  .healthMonthCell.cond4{ background:rgba(74,222,128,.22); }
+  .healthMonthCell.cond5{ background:rgba(74,222,128,.45); }
+  .healthMonthDayNum{ font-size:10px; font-weight:700; line-height:1; }
+  .healthMonthCondEmoji{ font-size:13px; line-height:1; margin:2px 0 1px; }
+  .healthMonthRecRow{ font-size:9px; line-height:1; }
+  /* Stats cards */
+  .healthStatsGrid{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:20px; }
+  .healthStatCard{ background:var(--card2); border-radius:11px; padding:11px 13px; }
+  .healthStatLabel{ font-size:10px; color:var(--muted); margin-bottom:4px; }
+  .healthStatValue{ font-size:22px; font-weight:900; line-height:1; }
+  .healthStatSub{ font-size:10px; color:var(--muted); margin-top:3px; }
+  /* Day detail bottom sheet */
+  .healthDetailPopup{ position:fixed; inset:0; z-index:9900; background:rgba(0,0,0,.6); display:none; align-items:flex-end; justify-content:center; }
+  .healthDetailPopup.show{ display:flex; }
+  .healthDetailCard{ background:var(--card); border-radius:18px 18px 0 0; padding:6px 18px 32px; width:100%; max-width:440px; border-top:3px solid var(--accent); max-height:80vh; overflow-y:auto; }
+  .healthDetailHandle{ width:36px; height:4px; border-radius:2px; background:var(--border); margin:10px auto 14px; }
+  .healthDetailDate{ font-size:12px; color:var(--muted); margin-bottom:12px; font-weight:600; }
+  .healthDetailRow{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); }
+  .healthDetailRow:last-child{ border-bottom:none; }
+  .healthDetailIcon{ font-size:20px; width:26px; text-align:center; flex-shrink:0; }
+  .healthDetailLabel{ font-size:12px; color:var(--muted); width:66px; flex-shrink:0; }
+  .healthDetailValue{ font-size:14px; font-weight:700; flex:1; }
+  .healthDetailBar{ height:6px; border-radius:3px; background:var(--card2); flex:1; overflow:hidden; }
+  .healthDetailBarFill{ height:100%; border-radius:3px; background:var(--accent); }
+  .healthDetailClose{ width:100%; padding:11px; border-radius:9px; border:none; background:var(--accent); color:#06201e; font-weight:700; margin-top:16px; cursor:pointer; font-size:14px; }
+  /* 건강 기록 열기 버튼 */
+  .healthDashOpenBtn{ width:100%; padding:12px; border-radius:11px; border:1px solid var(--accent); background:rgba(90,209,201,.08); color:var(--accent); font-weight:700; font-size:14px; cursor:pointer; margin-top:16px; display:flex; align-items:center; justify-content:center; gap:7px; }
+
+  /* ── HIIT 스프린트 타이머 ── */
+  .sprintConfigRow{ display:flex; gap:8px; margin:10px 0; }
+  .sprintConfigItem{ display:flex; flex-direction:column; align-items:center; gap:3px; flex:1; min-width:0; }
+  .sprintConfigLabel{ font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; text-align:center; }
+  .sprintConfigInput{ width:100%; text-align:center; padding:6px 4px; border-radius:8px; border:1px solid var(--border); background:var(--card2); color:var(--text); font-size:15px; font-weight:700; box-sizing:border-box; }
+  .sprintSetBtns{ display:flex; gap:4px; }
+  .sprintSetBtn{ width:30px; height:30px; border-radius:8px; border:2px solid transparent; background:var(--card2); color:var(--text); font-size:13px; font-weight:700; cursor:pointer; transition:all .15s; }
+  .sprintSetBtn.active{ border-color:var(--accent); color:var(--accent); }
+  .sprintTimerArea{ text-align:center; padding:14px 0 8px; }
+  .sprintPhaseLabel{ font-size:15px; font-weight:700; margin-bottom:10px; letter-spacing:.3px; }
+  .sprintPhaseLabel.sprinting{ color:#ff8a40; }
+  .sprintPhaseLabel.resting{ color:var(--accent); }
+  .sprintCountdownRing{ position:relative; width:110px; height:110px; margin:0 auto 8px; }
+  .sprintCountdownRing svg{ position:absolute; inset:0; }
+  .sprintCountdownNum{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:40px; font-weight:900; }
+  .sprintDots{ display:flex; gap:6px; justify-content:center; margin:8px 0 4px; }
+  .sprintDot{ width:10px; height:10px; border-radius:50%; background:var(--card2); border:2px solid var(--muted); transition:all .2s; }
+  .sprintDot.done{ background:var(--accent); border-color:var(--accent); }
+  .sprintDot.active{ background:#ff8a40; border-color:#ff8a40; transform:scale(1.3); }
+  .sprintProgressLabel{ font-size:12px; color:var(--muted); }
+  .sprintBtnRow{ display:flex; gap:8px; margin-top:10px; }
+  .sprintHistoryItem{ font-size:11px; color:var(--muted); padding:5px 0; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+  .sprintHistoryItem:last-child{ border-bottom:none; }
+
+  /* ── 회복 루틴 모달 ── */
+  .recoveryGrid{ display:flex; gap:12px; margin:12px 0 8px; }
+  .recoveryItem{ flex:1; text-align:center; }
+  .recoveryToggleBtn{ width:100%; padding:14px 8px 10px; border-radius:12px; border:2px solid var(--border); background:var(--card2); cursor:pointer; transition:all .15s; font-size:30px; display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .recoveryToggleBtn.on{ border-color:var(--accent); background:rgba(74,222,128,.15); }
+  .recoveryToggleLbl{ font-size:11px; color:var(--muted); font-weight:600; }
+  .recoveryToggleBtn.on .recoveryToggleLbl{ color:var(--accent); }
+  .recoveryDurRow{ display:flex; align-items:center; justify-content:center; gap:5px; margin-top:6px; font-size:12px; color:var(--muted); }
+  .recoveryDurInput{ width:52px; padding:4px 6px; border-radius:7px; border:1px solid var(--border); background:var(--card2); color:var(--text); font-size:14px; text-align:center; }
+  .recoveryHistGrid{ display:flex; flex-direction:column; gap:5px; margin-top:6px; }
+  .recoveryHistRow{ display:flex; align-items:center; gap:6px; font-size:11px; color:var(--muted); }
+  .recoveryHistDate{ flex-shrink:0; }
+  .recoveryBadge{ font-size:11px; background:var(--card2); border-radius:5px; padding:2px 6px; color:var(--text); display:inline-flex; align-items:center; gap:2px; }
 </style>
 </head>
 <body>
@@ -441,6 +550,78 @@
     <div class="vitalsGrid" id="trackerVitalsGrid"></div>
     <button id="condTrackerSaveBtn" onclick="saveTrackerCond()" style="width:100%;margin-top:10px;padding:10px;border-radius:8px;border:none;background:var(--accent);color:#06201e;font-weight:700;display:none;">지금 시간으로 저장</button>
     <button onclick="closeCondTracker()" class="modalClose" id="condTrackerCloseBtnEl" style="width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-weight:700;">닫기</button>
+  </div>
+</div>
+
+<!-- 건강 대시보드 (전체화면) -->
+<div class="healthDashOverlay" id="healthDashOverlay">
+  <div class="healthDashHeader">
+    <button class="healthDashClose" onclick="closeHealthDash()">✕</button>
+    <span class="healthDashTitle" id="healthDashTitleEl">📊 건강 기록</span>
+    <span style="width:40px;"></span>
+  </div>
+  <div class="healthDashScroll">
+    <!-- 주간 스트립 -->
+    <div class="healthNavBar">
+      <button class="healthNavBtn" onclick="healthWeekPrev()">‹</button>
+      <span class="healthNavLabel" id="healthWeekLabel">이번 주</span>
+      <button class="healthNavBtn" id="healthWeekNextBtn" onclick="healthWeekNext()">›</button>
+    </div>
+    <div class="healthWeekStrip" id="healthWeekStrip"></div>
+    <!-- 통계 -->
+    <div id="healthStats"></div>
+    <!-- 월간 히트맵 -->
+    <div class="healthNavBar" style="margin-top:4px;">
+      <button class="healthNavBtn" onclick="healthMonthPrev()">‹</button>
+      <span class="healthNavLabel" id="healthMonthLabel">2026년 10월</span>
+      <button class="healthNavBtn" id="healthMonthNextBtn" onclick="healthMonthNext()">›</button>
+    </div>
+    <div class="healthMonthGridEl" id="healthMonthGrid"></div>
+  </div>
+</div>
+<!-- 날짜 상세 팝업 (바텀시트) -->
+<div class="healthDetailPopup" id="healthDetailPopup" onclick="closeHealthDetail()">
+  <div class="healthDetailCard" onclick="event.stopPropagation()">
+    <div class="healthDetailHandle"></div>
+    <div class="healthDetailDate" id="healthDetailDate"></div>
+    <div id="healthDetailRows"></div>
+    <button class="healthDetailClose" onclick="closeHealthDetail()" id="healthDetailCloseBtn">확인</button>
+  </div>
+</div>
+
+<!-- 회복 루틴 모달 -->
+<div class="modal-overlay" id="recoveryOverlay">
+  <div class="modal" style="max-width:340px;">
+    <h4 id="recoveryModalTitle">💧 회복 루틴</h4>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+      <span style="font-size:12px;color:var(--muted);">📅</span>
+      <input type="date" id="recoveryDatePicker" style="flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--card2);color:var(--text);font-size:13px;" onchange="loadRecoveryForDate(this.value)">
+    </div>
+    <div class="recoveryGrid">
+      <div class="recoveryItem">
+        <button class="recoveryToggleBtn" id="recoveryBtn-coldShower" onclick="toggleRecoveryItem('coldShower')">
+          🧊<div class="recoveryToggleLbl" id="recoveryLbl-coldShower">냉수샤워</div>
+        </button>
+        <div class="recoveryDurRow" id="recoveryDur-coldShower" style="display:none;">
+          <input type="number" class="recoveryDurInput" id="recoveryMins-coldShower" min="1" max="30" placeholder="--">
+          <span>분</span>
+        </div>
+      </div>
+      <div class="recoveryItem">
+        <button class="recoveryToggleBtn" id="recoveryBtn-sauna" onclick="toggleRecoveryItem('sauna')">
+          🔥<div class="recoveryToggleLbl" id="recoveryLbl-sauna">사우나</div>
+        </button>
+        <div class="recoveryDurRow" id="recoveryDur-sauna" style="display:none;">
+          <input type="number" class="recoveryDurInput" id="recoveryMins-sauna" min="1" max="120" placeholder="--">
+          <span>분</span>
+        </div>
+      </div>
+    </div>
+    <div id="recoveryHistoryArea"></div>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button onclick="saveRecovery()" style="flex:2;padding:10px;border-radius:8px;border:none;background:var(--accent);color:#06201e;font-weight:700;font-size:14px;cursor:pointer;">저장</button>
+      <button onclick="closeRecovery()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-weight:700;cursor:pointer;">닫기</button>
+    </div>
   </div>
 </div>
 
@@ -532,7 +713,11 @@
     <div class="btnrow" style="margin-top:14px;">
       <button class="secondary" id="saveHistoryBtn" onclick="saveJournalToHistory()">💾 오늘 기록 저장</button>
       <button class="secondary" onclick="openCondTracker()">📊 컨디션</button>
+      <button class="secondary" onclick="openRecovery()">💧 회복</button>
     </div>
+    <button class="healthDashOpenBtn" onclick="openHealthDash()">
+      <span>📊</span><span id="healthDashOpenBtnText">건강 기록 한눈에 보기</span>
+    </button>
     <div class="calendarWrap" id="calendarWrap">
       <div class="calHeader">
         <button id="calPrevBtn" onclick="calPrevMonth()">‹</button>
@@ -559,6 +744,65 @@
   </section>
 
   <section class="tabpanel" id="tab-running">
+
+    <!-- HIIT 스프린트 타이머 -->
+    <div class="addbox" style="margin-bottom:14px;" id="sprintBox">
+      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleSprintSection()">
+        <h3 id="sprintSectionTitle" style="margin:0;">⚡ HIIT 스프린트</h3>
+        <span id="sprintToggleIcon" style="color:var(--muted);font-size:13px;">▼</span>
+      </div>
+      <div id="sprintContent">
+        <div class="sprintConfigRow">
+          <div class="sprintConfigItem">
+            <span class="sprintConfigLabel" id="sprintDistLabel">거리</span>
+            <input type="text" class="sprintConfigInput" id="sprintDistInput" value="50m">
+          </div>
+          <div class="sprintConfigItem">
+            <span class="sprintConfigLabel" id="sprintRunLabel">전력질주</span>
+            <div style="display:flex;align-items:center;gap:2px;">
+              <input type="number" class="sprintConfigInput" id="sprintRunTime" value="15" min="5" max="60" style="width:46px;">
+              <span style="font-size:11px;color:var(--muted);">초</span>
+            </div>
+          </div>
+          <div class="sprintConfigItem">
+            <span class="sprintConfigLabel" id="sprintRestLabel">휴식</span>
+            <div style="display:flex;align-items:center;gap:2px;">
+              <input type="number" class="sprintConfigInput" id="sprintRestTime" value="60" min="10" max="300" style="width:46px;">
+              <span style="font-size:11px;color:var(--muted);">초</span>
+            </div>
+          </div>
+          <div class="sprintConfigItem">
+            <span class="sprintConfigLabel" id="sprintSetsLabel">세트</span>
+            <div class="sprintSetBtns" id="sprintSetBtns">
+              <button class="sprintSetBtn" onclick="setSprintSets(3)">3</button>
+              <button class="sprintSetBtn active" onclick="setSprintSets(4)">4</button>
+              <button class="sprintSetBtn" onclick="setSprintSets(5)">5</button>
+            </div>
+          </div>
+        </div>
+        <div class="sprintTimerArea" id="sprintTimerArea" style="display:none;">
+          <div class="sprintPhaseLabel" id="sprintPhaseLabel">🏃 전력질주!</div>
+          <div class="sprintCountdownRing">
+            <svg width="110" height="110" viewBox="0 0 110 110">
+              <circle cx="55" cy="55" r="46" fill="none" stroke="var(--card2)" stroke-width="8"/>
+              <circle id="sprintRingArc" cx="55" cy="55" r="46" fill="none" stroke="#ff8a40" stroke-width="8"
+                stroke-dasharray="289.0" stroke-dashoffset="0" stroke-linecap="round"
+                style="transform:rotate(-90deg);transform-origin:55px 55px;transition:stroke-dashoffset .9s linear,stroke .3s;"/>
+            </svg>
+            <div class="sprintCountdownNum" id="sprintCountdownNum">15</div>
+          </div>
+          <div class="sprintDots" id="sprintDots"></div>
+          <div class="sprintProgressLabel" id="sprintProgressLabel">1 / 4 세트</div>
+        </div>
+        <div class="sprintBtnRow">
+          <button class="submit" id="sprintStartBtn" onclick="startSprint()" style="flex:1;">⚡ 시작</button>
+          <button class="secondary" id="sprintPauseBtn" onclick="pauseSprint()" style="flex:1;display:none;" id="sprintPauseBtn">⏸ 일시정지</button>
+          <button id="sprintStopBtn" onclick="stopSprint()" style="flex:.45;display:none;padding:10px;border-radius:8px;border:1px solid #5a2e3a;background:#2a1020;color:#ff8a8a;font-weight:700;cursor:pointer;font-size:14px;">■</button>
+        </div>
+        <div id="sprintHistoryArea" style="margin-top:10px;"></div>
+      </div>
+    </div>
+
     <div class="addbox">
       <h3 id="runUploadTitle">📷 러닝 스크린샷으로 자동 등록</h3>
       <p class="runHint" id="runOcrHint">Nike Run Club 등 러닝 앱의 활동 화면을 캡처해서 올리면 거리·페이스·시간을 자동으로 인식해요.</p>
@@ -1046,6 +1290,8 @@ const GIST_ID_KEY     = "wt_gist_id_v1";
 const GIST_SYNC_KEY   = "wt_gist_sync_v1"; // 마지막 성공 sync timestamp
 const STORAGE_KEY_BUILTIN_SNAPSHOT = "wt_builtin_snapshot_v1"; // 내장 운동 스냅샷 (export 복원용)
 const STORAGE_KEY_COUNTER_ORDER = "wt_counter_order_v1"; // 카운터 탭 운동 순서
+const STORAGE_KEY_SPRINT   = "wt_sprint_v1";   // HIIT 스프린트 세션 기록
+const STORAGE_KEY_RECOVERY = "wt_recovery_v1"; // 회복 루틴 (냉수샤워, 사우나)
 
 let currentCat = "등";
 let todayState = loadToday(); // { id: {checked:bool, sets:int, done:[bool,...]} }
@@ -2016,6 +2262,24 @@ function generateJournal(){
     }
   }catch(e){}
 
+  // 회복 루틴 섹션 — 냉수샤워/사우나 기록 포함
+  try{
+    const _jRecovery = getRecovery(_journalDateKey);
+    if(_jRecovery){
+      const ko = currentLang === "ko";
+      const recLines = RECOVERY_CONFIG.filter(cfg=>_jRecovery[cfg.key]).map(cfg=>{
+        const m = _jRecovery[cfg.key+"Mins"];
+        const label = ko ? cfg.ko : cfg.en;
+        return `  ${cfg.icon} ${label}${m ? ` (${m}분)` : ""}`;
+      });
+      if(recLines.length > 0){
+        lines.push("");
+        lines.push(ko ? "💧 회복 루틴" : "💧 Recovery");
+        recLines.forEach(l=>lines.push(l));
+      }
+    }
+  }catch(e){}
+
   // RIR 요약 섹션 — RIR 데이터가 하나라도 있을 때만 출력
   try{
     const rirSummaryLines = [];
@@ -2151,6 +2415,8 @@ function renderHistory(){
     try{
       const vitals = getVitals(h.date);
       if(vitals) _vitalsBadge = buildVitalsBadgeHTML(vitals);
+      const rec = getRecovery(h.date);
+      if(rec) _vitalsBadge += buildRecoveryBadgeHTML(rec);
     }catch(e){}
     div.innerHTML = `<div class="hrow"><div class="hdate">${h.date}${_volBadge}</div><button class="hDeleteBtn" data-idx="${idx}">🗑</button></div>${_vitalsBadge}<div>${h.text.split("\n")[0]}</div>`;
     div.onclick = (e)=>{
@@ -2844,6 +3110,7 @@ function switchTab(id){
   if(id==="tab-running"){
     if(!document.getElementById("runDateInput").value) document.getElementById("runDateInput").value = todayDateKey();
     renderRunHistory(); renderRunCalendar();
+    renderSprintHistory();
   }
 }
 
@@ -3345,6 +3612,445 @@ function buildVitalsBadgeHTML(vitals){
   }).filter(Boolean);
   if(!parts.length) return "";
   return `<div class="vitalsBadgeRow">${parts.join("")}</div>`;
+}
+
+// ── 회복 루틴 (냉수샤워 / 사우나) ───────────────────────────────────────────
+const RECOVERY_CONFIG = [
+  { key:"coldShower", icon:"🧊", ko:"냉수샤워", en:"Cold Shower" },
+  { key:"sauna",      icon:"🔥", ko:"사우나",    en:"Sauna" },
+];
+
+function getRecovery(dateKey){
+  try{ const v=JSON.parse(localStorage.getItem(STORAGE_KEY_RECOVERY)||"{}"); return v[dateKey]||null; }catch(e){ return null; }
+}
+function saveRecoveryData(dateKey, data){
+  try{
+    const v=JSON.parse(localStorage.getItem(STORAGE_KEY_RECOVERY)||"{}");
+    v[dateKey]=data;
+    localStorage.setItem(STORAGE_KEY_RECOVERY, JSON.stringify(v));
+    if(typeof scheduleGistSave==="function") scheduleGistSave();
+  }catch(e){}
+}
+function openRecovery(){
+  const dp=document.getElementById("recoveryDatePicker");
+  if(dp) dp.value=todayDateKey();
+  loadRecoveryForDate(todayDateKey());
+  renderRecoveryHistory();
+  document.getElementById("recoveryOverlay").classList.add("show");
+}
+function closeRecovery(){
+  document.getElementById("recoveryOverlay").classList.remove("show");
+}
+function loadRecoveryForDate(dateKey){
+  const saved=getRecovery(dateKey);
+  RECOVERY_CONFIG.forEach(cfg=>{
+    const on=saved && saved[cfg.key]===true;
+    const mins=saved ? (saved[cfg.key+"Mins"]||"") : "";
+    const btn=document.getElementById("recoveryBtn-"+cfg.key);
+    const durRow=document.getElementById("recoveryDur-"+cfg.key);
+    const inp=document.getElementById("recoveryMins-"+cfg.key);
+    if(btn) btn.classList.toggle("on", on);
+    if(durRow) durRow.style.display=on?"flex":"none";
+    if(inp) inp.value=mins;
+  });
+}
+function toggleRecoveryItem(key){
+  const btn=document.getElementById("recoveryBtn-"+key);
+  const durRow=document.getElementById("recoveryDur-"+key);
+  const on=!btn.classList.contains("on");
+  btn.classList.toggle("on", on);
+  if(durRow) durRow.style.display=on?"flex":"none";
+  if(!on){ const inp=document.getElementById("recoveryMins-"+key); if(inp) inp.value=""; }
+}
+function saveRecovery(){
+  const dp=document.getElementById("recoveryDatePicker");
+  const dateKey=(dp&&dp.value)?dp.value:todayDateKey();
+  const data={};
+  RECOVERY_CONFIG.forEach(cfg=>{
+    const btn=document.getElementById("recoveryBtn-"+cfg.key);
+    const on=btn&&btn.classList.contains("on");
+    const inp=document.getElementById("recoveryMins-"+cfg.key);
+    const mins=inp?parseInt(inp.value)||0:0;
+    data[cfg.key]=!!on;
+    if(on&&mins>0) data[cfg.key+"Mins"]=mins;
+  });
+  const hasAny=RECOVERY_CONFIG.some(cfg=>data[cfg.key]);
+  if(!hasAny){ showToast(currentLang==="ko"?"선택된 항목이 없어요":"Nothing selected"); return; }
+  saveRecoveryData(dateKey, data);
+  renderRecoveryHistory();
+  renderHistory();
+  showToast(currentLang==="ko"?"회복 루틴 저장됨 💧":"Recovery logged 💧");
+}
+function renderRecoveryHistory(){
+  const el=document.getElementById("recoveryHistoryArea");
+  if(!el) return;
+  try{
+    const all=JSON.parse(localStorage.getItem(STORAGE_KEY_RECOVERY)||"{}");
+    const keys=Object.keys(all).sort().reverse().slice(0,7);
+    if(!keys.length){ el.innerHTML=""; return; }
+    const ko=currentLang==="ko";
+    el.innerHTML=`<div style="font-size:10px;color:var(--muted);margin:8px 0 5px;">${ko?"최근 기록":"Recent"}</div>
+      <div class="recoveryHistGrid">`+
+      keys.map(dk=>{
+        const d=all[dk];
+        const badges=RECOVERY_CONFIG.filter(cfg=>d[cfg.key]).map(cfg=>{
+          const m=d[cfg.key+"Mins"];
+          return `<span class="recoveryBadge">${cfg.icon} ${ko?cfg.ko:cfg.en}${m?` ${m}분`:""}</span>`;
+        }).join("");
+        return `<div class="recoveryHistRow"><span class="recoveryHistDate">${dk}</span>${badges}</div>`;
+      }).join("")+"</div>";
+  }catch(e){ el.innerHTML=""; }
+}
+function buildRecoveryBadgeHTML(recovery){
+  if(!recovery) return "";
+  const ko=currentLang==="ko";
+  const parts=RECOVERY_CONFIG.filter(cfg=>recovery[cfg.key]).map(cfg=>{
+    const m=recovery[cfg.key+"Mins"];
+    return `<span class="recoveryBadge">${cfg.icon}${m?` ${m}분`:""}</span>`;
+  });
+  if(!parts.length) return "";
+  return `<div class="vitalsBadgeRow">${parts.join("")}</div>`;
+}
+
+// ── HIIT 스프린트 타이머 ─────────────────────────────────────────────────────
+let _sprintState = {
+  active:false, paused:false,
+  currentSet:1, totalSets:4, phase:"sprint",
+  timeLeft:15, sprintTime:15, restTime:60, dist:"50m"
+};
+let _sprintInterval = null;
+
+function setSprintSets(n){
+  _sprintState.totalSets = n;
+  document.querySelectorAll(".sprintSetBtn").forEach(b=> b.classList.toggle("active", +b.textContent===n));
+}
+
+function toggleSprintSection(){
+  const c=document.getElementById("sprintContent");
+  const icon=document.getElementById("sprintToggleIcon");
+  if(!c) return;
+  const isOpen=c.style.display!=="none";
+  c.style.display=isOpen?"none":"block";
+  if(icon) icon.textContent=isOpen?"▶":"▼";
+}
+
+function startSprint(){
+  const dist=document.getElementById("sprintDistInput").value||"50m";
+  const st=parseInt(document.getElementById("sprintRunTime").value)||15;
+  const rt=parseInt(document.getElementById("sprintRestTime").value)||60;
+  _sprintState={active:true,paused:false,currentSet:1,totalSets:_sprintState.totalSets||4,
+    phase:"sprint",timeLeft:st,sprintTime:st,restTime:rt,dist};
+  document.getElementById("sprintTimerArea").style.display="block";
+  document.getElementById("sprintStartBtn").style.display="none";
+  document.getElementById("sprintPauseBtn").style.display="block";
+  document.getElementById("sprintStopBtn").style.display="block";
+  updateSprintUI();
+  if(_sprintInterval) clearInterval(_sprintInterval);
+  _sprintInterval=setInterval(tickSprint, 1000);
+  beepSprint(1200,0.12);
+}
+
+function tickSprint(){
+  if(_sprintState.paused||!_sprintState.active) return;
+  _sprintState.timeLeft--;
+  if(_sprintState.timeLeft>0 && _sprintState.timeLeft<=3) beepSprint(440,0.07);
+  if(_sprintState.timeLeft<=0){
+    if(_sprintState.phase==="sprint"){
+      beepSprint(800,0.15);
+      if(_sprintState.currentSet>=_sprintState.totalSets){ sprintDone(); return; }
+      _sprintState.phase="rest"; _sprintState.timeLeft=_sprintState.restTime;
+      beepSprint(600,0.12);
+    } else {
+      beepSprint(1200,0.15);
+      _sprintState.currentSet++; _sprintState.phase="sprint"; _sprintState.timeLeft=_sprintState.sprintTime;
+    }
+  }
+  updateSprintUI();
+}
+
+function updateSprintUI(){
+  const s=_sprintState;
+  const ko=currentLang==="ko";
+  const isSpr=s.phase==="sprint";
+  const ph=document.getElementById("sprintPhaseLabel");
+  if(ph){ ph.textContent=isSpr?`🏃 ${ko?"전력질주!":"SPRINT!"}`:`😮‍💨 ${ko?"휴식 중":"REST"}`; ph.className="sprintPhaseLabel "+(isSpr?"sprinting":"resting"); }
+  const num=document.getElementById("sprintCountdownNum");
+  if(num) num.textContent=s.timeLeft;
+  const arc=document.getElementById("sprintRingArc");
+  if(arc){
+    const maxT=isSpr?s.sprintTime:s.restTime;
+    const C=2*Math.PI*46; // r=46
+    arc.style.strokeDashoffset=(C*(1-s.timeLeft/maxT));
+    arc.style.stroke=isSpr?"#ff8a40":"var(--accent)";
+  }
+  const dots=document.getElementById("sprintDots");
+  if(dots) dots.innerHTML=Array.from({length:s.totalSets},(_,i)=>{
+    const done=i<s.currentSet-1, cur=i===s.currentSet-1;
+    return `<div class="sprintDot${done?" done":cur?" active":""}"></div>`;
+  }).join("");
+  const prog=document.getElementById("sprintProgressLabel");
+  if(prog) prog.textContent=ko?`${s.currentSet} / ${s.totalSets} 세트`:`Set ${s.currentSet} / ${s.totalSets}`;
+}
+
+function pauseSprint(){
+  _sprintState.paused=!_sprintState.paused;
+  const ko=currentLang==="ko";
+  document.getElementById("sprintPauseBtn").textContent=_sprintState.paused?(ko?"▶ 재개":"▶ Resume"):(ko?"⏸ 일시정지":"⏸ Pause");
+}
+
+function stopSprint(){
+  clearInterval(_sprintInterval); _sprintInterval=null;
+  _sprintState.active=false; _sprintState.paused=false;
+  document.getElementById("sprintTimerArea").style.display="none";
+  document.getElementById("sprintStartBtn").style.display="block";
+  document.getElementById("sprintStartBtn").textContent=currentLang==="ko"?"⚡ 시작":"⚡ Start";
+  document.getElementById("sprintPauseBtn").style.display="none";
+  document.getElementById("sprintStopBtn").style.display="none";
+}
+
+function sprintDone(){
+  clearInterval(_sprintInterval); _sprintInterval=null;
+  _sprintState.active=false;
+  const session={date:todayDateKey(),time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}),
+    sets:_sprintState.totalSets,dist:_sprintState.dist,sprintTime:_sprintState.sprintTime,restTime:_sprintState.restTime};
+  try{
+    const arr=JSON.parse(localStorage.getItem(STORAGE_KEY_SPRINT)||"[]");
+    arr.unshift(session);
+    localStorage.setItem(STORAGE_KEY_SPRINT, JSON.stringify(arr.slice(0,100)));
+  }catch(e){}
+  // 완료 UI
+  const ph=document.getElementById("sprintPhaseLabel");
+  if(ph){ ph.textContent="🎉 "+(currentLang==="ko"?"완료! 수고했어요 💪":"Done! Great work 💪"); ph.className="sprintPhaseLabel"; }
+  const num=document.getElementById("sprintCountdownNum"); if(num) num.textContent="✓";
+  const arc=document.getElementById("sprintRingArc");
+  if(arc){ arc.style.stroke="var(--accent)"; arc.style.strokeDashoffset="0"; }
+  document.getElementById("sprintDots").querySelectorAll(".sprintDot").forEach(d=>{ d.classList.remove("active"); d.classList.add("done"); });
+  beepSprint(1000,0.15); setTimeout(()=>beepSprint(1200,0.15),180); setTimeout(()=>beepSprint(1600,0.25),360);
+  document.getElementById("sprintPauseBtn").style.display="none";
+  document.getElementById("sprintStopBtn").style.display="none";
+  document.getElementById("sprintStartBtn").style.display="block";
+  document.getElementById("sprintStartBtn").textContent=currentLang==="ko"?"⚡ 다시 시작":"⚡ Start Again";
+  renderSprintHistory();
+  if(typeof scheduleGistSave==="function") scheduleGistSave();
+}
+
+function beepSprint(freq, dur){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const osc=ctx.createOscillator(), gain=ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type="sine"; osc.frequency.value=freq;
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+dur);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime+dur);
+  }catch(e){}
+}
+
+function renderSprintHistory(){
+  const el=document.getElementById("sprintHistoryArea"); if(!el) return;
+  try{
+    const arr=JSON.parse(localStorage.getItem(STORAGE_KEY_SPRINT)||"[]");
+    if(!arr.length){ el.innerHTML=""; return; }
+    const ko=currentLang==="ko";
+    el.innerHTML=`<div style="font-size:10px;color:var(--muted);margin-bottom:4px;">${ko?"최근 스프린트":"Recent sprints"}</div>`+
+      arr.slice(0,5).map(s=>`<div class="sprintHistoryItem">
+        <span>${s.date}${s.time?" "+s.time:""}</span>
+        <span>${s.dist} · ${s.sets}${ko?"세트":"sets"} · ${s.sprintTime}${ko?"초":"s"}/${s.restTime}${ko?"초 휴식":"s rest"}</span>
+      </div>`).join("");
+  }catch(e){ el.innerHTML=""; }
+}
+
+// ── 건강 대시보드 ─────────────────────────────────────────────────────────────
+let _healthWeekOffset = 0;
+let _healthMonthYear = new Date().getFullYear();
+let _healthMonthMo   = new Date().getMonth();
+
+function openHealthDash(){
+  _healthWeekOffset = 0;
+  _healthMonthYear = new Date().getFullYear();
+  _healthMonthMo   = new Date().getMonth();
+  renderHealthWeekStrip();
+  renderHealthStats();
+  renderHealthMonthGrid();
+  document.getElementById("healthDashOverlay").classList.add("show");
+}
+function closeHealthDash(){
+  document.getElementById("healthDashOverlay").classList.remove("show");
+}
+
+function _getWeekDates(offset){
+  const now = new Date();
+  const dow = now.getDay(); // 0=Sun
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (dow===0?6:dow-1) + offset*7);
+  monday.setHours(0,0,0,0);
+  return Array.from({length:7},(_,i)=>{
+    const d=new Date(monday); d.setDate(monday.getDate()+i); return d;
+  });
+}
+
+function renderHealthWeekStrip(){
+  const ko = currentLang==="ko";
+  const days = _getWeekDates(_healthWeekOffset);
+  const today = todayDateKey();
+  const strip = document.getElementById("healthWeekStrip"); if(!strip) return;
+  const dayNamesKo=["월","화","수","목","금","토","일"];
+  const dayNamesEn=["MON","TUE","WED","THU","FRI","SAT","SUN"];
+  const names = ko ? dayNamesKo : dayNamesEn;
+  strip.innerHTML = days.map((d,i)=>{
+    const dk = d.toISOString().split("T")[0];
+    const isToday = dk===today, isFuture = dk>today;
+    const vitals = isFuture?null:getVitals(dk);
+    const rec = isFuture?null:getRecovery(dk);
+    const cond = vitals?(vitals.cond||0):0;
+    const circCls = cond?`c${cond}`:"empty";
+    const condEmoji = cond?COND_EMOJI[cond]:"";
+    const vMini = vitals ? VITALS_CONFIG.filter(v=>v.key!=="cond"&&vitals[v.key]).map(v=>v.emojis[vitals[v.key]]||"").join("") : "";
+    const rMini = rec ? RECOVERY_CONFIG.filter(r=>rec[r.key]).map(r=>r.icon).join("") : "";
+    return `<div class="healthDayCard${isToday?" today":""}${isFuture?" future":""}" onclick="openHealthDetail('${dk}')">
+      <div class="healthDayName">${names[i]}</div>
+      <div class="healthDayNum">${d.getDate()}</div>
+      <div class="healthCondCircle ${circCls}">${condEmoji||"·"}</div>
+      <div class="healthVitalsMini">${vMini}</div>
+      <div class="healthRecMini">${rMini}</div>
+    </div>`;
+  }).join("");
+  const lbl = document.getElementById("healthWeekLabel");
+  if(lbl){
+    if(_healthWeekOffset===0) lbl.textContent = ko?"이번 주":"This Week";
+    else if(_healthWeekOffset===-1) lbl.textContent = ko?"지난 주":"Last Week";
+    else{
+      const f=days[0],l=days[6];
+      lbl.textContent = ko?`${f.getMonth()+1}/${f.getDate()} – ${l.getMonth()+1}/${l.getDate()}`
+        :`${f.toLocaleDateString("en-US",{month:"short",day:"numeric"})} – ${l.toLocaleDateString("en-US",{month:"short",day:"numeric"})}`;
+    }
+  }
+  const nxtBtn = document.getElementById("healthWeekNextBtn");
+  if(nxtBtn) nxtBtn.disabled = _healthWeekOffset>=0;
+}
+function healthWeekPrev(){ _healthWeekOffset--; renderHealthWeekStrip(); renderHealthStats(); }
+function healthWeekNext(){ if(_healthWeekOffset>=0) return; _healthWeekOffset++; renderHealthWeekStrip(); renderHealthStats(); }
+
+function renderHealthStats(){
+  const ko = currentLang==="ko";
+  const today = todayDateKey();
+  const dates = _getWeekDates(_healthWeekOffset).map(d=>d.toISOString().split("T")[0]).filter(dk=>dk<=today);
+  const vArr = dates.map(dk=>getVitals(dk)).filter(Boolean);
+  const rArr = dates.map(dk=>getRecovery(dk)).filter(Boolean);
+  const avgCond = vArr.length ? (vArr.reduce((a,v)=>a+(v.cond||0),0)/vArr.length) : 0;
+  const avgCondStr = avgCond ? avgCond.toFixed(1) : "−";
+  const condEmoji = avgCond ? (COND_EMOJI[Math.round(avgCond)]||"") : "";
+  const coldCnt = rArr.filter(r=>r.coldShower).length;
+  const saunaCnt = rArr.filter(r=>r.sauna).length;
+  const logDays = dates.filter(dk=>getVitals(dk)||getRecovery(dk)).length;
+  const el = document.getElementById("healthStats"); if(!el) return;
+  el.innerHTML=`<div class="healthStatsGrid">
+    <div class="healthStatCard">
+      <div class="healthStatLabel">${ko?"평균 컨디션":"Avg Condition"}</div>
+      <div class="healthStatValue">${condEmoji} ${avgCondStr}</div>
+      <div class="healthStatSub">${ko?"/ 5점":"/ 5"}</div>
+    </div>
+    <div class="healthStatCard">
+      <div class="healthStatLabel">${ko?"기록한 날":"Days Logged"}</div>
+      <div class="healthStatValue">${logDays}</div>
+      <div class="healthStatSub">${ko?"일":"days"}</div>
+    </div>
+    <div class="healthStatCard">
+      <div class="healthStatLabel">🧊 ${ko?"냉수샤워":"Cold Shower"}</div>
+      <div class="healthStatValue">${coldCnt}</div>
+      <div class="healthStatSub">${ko?"일":"days"}</div>
+    </div>
+    <div class="healthStatCard">
+      <div class="healthStatLabel">🔥 ${ko?"사우나":"Sauna"}</div>
+      <div class="healthStatValue">${saunaCnt}</div>
+      <div class="healthStatSub">${ko?"일":"days"}</div>
+    </div>
+  </div>`;
+}
+
+function renderHealthMonthGrid(){
+  const ko = currentLang==="ko";
+  const today = todayDateKey();
+  const yr=_healthMonthYear, mo=_healthMonthMo;
+  const daysInMo = new Date(yr,mo+1,0).getDate();
+  const firstDow = (new Date(yr,mo,1).getDay()+6)%7; // 0=Mon
+  const wkNames = ko?["월","화","수","목","금","토","일"]:["M","T","W","T","F","S","S"];
+  const grid = document.getElementById("healthMonthGrid"); if(!grid) return;
+  let html = wkNames.map(w=>`<div class="healthMonthWeekday">${w}</div>`).join("");
+  for(let i=0;i<firstDow;i++) html+=`<div class="healthMonthCell empty"></div>`;
+  for(let day=1;day<=daysInMo;day++){
+    const mm=String(mo+1).padStart(2,"0"), dd=String(day).padStart(2,"0");
+    const dk=`${yr}-${mm}-${dd}`;
+    const isToday=dk===today, isFuture=dk>today;
+    if(isFuture){ html+=`<div class="healthMonthCell future"><div class="healthMonthDayNum">${day}</div></div>`; continue; }
+    const vitals=getVitals(dk), rec=getRecovery(dk);
+    const cond=vitals?(vitals.cond||0):0;
+    const condCls=cond?`cond${cond}`:"";
+    const condEmoji=cond?(COND_EMOJI[cond]||""):"";
+    const recIcons=[rec&&rec.coldShower?"🧊":"", rec&&rec.sauna?"🔥":""].filter(Boolean).join("");
+    html+=`<div class="healthMonthCell ${condCls}${isToday?" today":""}" onclick="openHealthDetail('${dk}')">
+      <div class="healthMonthDayNum">${day}</div>
+      ${condEmoji?`<div class="healthMonthCondEmoji">${condEmoji}</div>`:""}
+      ${recIcons?`<div class="healthMonthRecRow">${recIcons}</div>`:""}
+    </div>`;
+  }
+  grid.innerHTML=html;
+  const lbl=document.getElementById("healthMonthLabel");
+  if(lbl) lbl.textContent=ko?`${yr}년 ${mo+1}월`:new Date(yr,mo,1).toLocaleDateString("en-US",{year:"numeric",month:"long"});
+  const nxtBtn=document.getElementById("healthMonthNextBtn");
+  if(nxtBtn){ const now=new Date(); nxtBtn.disabled=yr>now.getFullYear()||(yr===now.getFullYear()&&mo>=now.getMonth()); }
+}
+function healthMonthPrev(){ _healthMonthMo--; if(_healthMonthMo<0){_healthMonthMo=11;_healthMonthYear--;} renderHealthMonthGrid(); }
+function healthMonthNext(){
+  const now=new Date();
+  if(_healthMonthYear>now.getFullYear()||(_healthMonthYear===now.getFullYear()&&_healthMonthMo>=now.getMonth())) return;
+  _healthMonthMo++; if(_healthMonthMo>11){_healthMonthMo=0;_healthMonthYear++;} renderHealthMonthGrid();
+}
+
+function openHealthDetail(dateKey){
+  const ko = currentLang==="ko";
+  const vitals=getVitals(dateKey)||{};
+  const recovery=getRecovery(dateKey)||{};
+  const sprints=(()=>{ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY_SPRINT)||"[]").filter(s=>s.date===dateKey); }catch(e){return [];} })();
+  const d=new Date(dateKey+"T00:00:00");
+  const dateStr=ko?d.toLocaleDateString("ko-KR",{year:"numeric",month:"long",day:"numeric",weekday:"short"}):d.toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric",weekday:"short"});
+  let rows="";
+  VITALS_CONFIG.forEach(cfg=>{
+    const val=vitals[cfg.key]; if(!val) return;
+    const label=ko?cfg.ko:cfg.en;
+    const pct=val/5*100;
+    rows+=`<div class="healthDetailRow">
+      <div class="healthDetailIcon">${cfg.icon}</div>
+      <div class="healthDetailLabel">${label}</div>
+      <div class="healthDetailValue">${cfg.emojis[val]} ${ko?cfg.labelsKo[val]:cfg.labelsEn[val]}</div>
+      <div class="healthDetailBar"><div class="healthDetailBarFill" style="width:${pct}%"></div></div>
+    </div>`;
+  });
+  RECOVERY_CONFIG.forEach(cfg=>{
+    if(!recovery[cfg.key]) return;
+    const label=ko?cfg.ko:cfg.en;
+    const mins=recovery[cfg.key+"Mins"];
+    rows+=`<div class="healthDetailRow">
+      <div class="healthDetailIcon">${cfg.icon}</div>
+      <div class="healthDetailLabel">${label}</div>
+      <div class="healthDetailValue">✅ ${mins?`${mins}분`:(ko?"완료":"Done")}</div>
+    </div>`;
+  });
+  if(sprints.length){
+    const s=sprints[0];
+    rows+=`<div class="healthDetailRow">
+      <div class="healthDetailIcon">⚡</div>
+      <div class="healthDetailLabel">${ko?"스프린트":"Sprint"}</div>
+      <div class="healthDetailValue">${s.dist} · ${s.sets}${ko?"세트":"sets"} · ${s.sprintTime}${ko?"초":"s"}/${s.restTime}${ko?"초":"s"}</div>
+    </div>`;
+  }
+  if(!rows) rows=`<div style="text-align:center;padding:24px;color:var(--muted);font-size:13px;">${ko?"이 날은 기록이 없어요":"No data for this day"}</div>`;
+  document.getElementById("healthDetailDate").textContent=dateStr;
+  document.getElementById("healthDetailRows").innerHTML=rows;
+  document.getElementById("healthDetailPopup").classList.add("show");
+}
+function closeHealthDetail(){
+  document.getElementById("healthDetailPopup").classList.remove("show");
 }
 
 // 날짜별 컨디션 항목 읽기 (이전 데이터 {날짜:숫자} 호환)
@@ -3983,5 +4689,28 @@ if(gistToken()){
   </div>
 </div>
 
+<script>
+// ── PWA 서비스워커 (오프라인 캐시) ──────────────────────────────────────────
+if("serviceWorker" in navigator){
+  const SW_CODE = `
+    const CACHE = "gymbuddy-v1";
+    self.addEventListener("install", e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(["./"])));
+      self.skipWaiting();
+    });
+    self.addEventListener("fetch", e => {
+      e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => {
+        if(res.ok) { const cl = res.clone(); caches.open(CACHE).then(c => c.put(e.request, cl)); }
+        return res;
+      }).catch(() => caches.match("./"))));
+    });
+  `;
+  const blob = new Blob([SW_CODE], {type:"text/javascript"});
+  const url  = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(url, {scope:"./"})
+    .then(()=>{ console.log("[GymBuddy] SW registered"); })
+    .catch(e=>{ /* 파일시스템에서 열 때는 무시 */ });
+}
+</script>
 </body>
 </html>
