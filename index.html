@@ -3642,11 +3642,13 @@ function openRecoveryForDate(dateKey){
   document.getElementById("recoveryOverlay").classList.add("show");
 }
 function openCondTrackerForDate(dateKey){
+  _condTrackerDateKey = dateKey;
+  _condTrackerVal = 0;
   switchTab("tab-journal");
-  // 날짜 피커가 있으면 해당 날짜로 맞춰줌
   const dp = document.getElementById("journalDatePicker");
   if(dp) dp.value = dateKey;
-  openCondTracker();
+  renderCondTracker();
+  document.getElementById("condTrackerOverlay").classList.add("show");
 }
 function closeRecovery(){
   document.getElementById("recoveryOverlay").classList.remove("show");
@@ -4079,14 +4081,16 @@ function getCondEntries(dateKey){
 }
 
 // 새 컨디션 항목 추가 (시간 자동 기록)
-function addConditionEntry(val){
-  const today = todayDateKey();
+function addConditionEntry(val, dateKey){
+  const targetDate = dateKey || todayDateKey();
+  const isToday = targetDate === todayDateKey();
   const cond = JSON.parse(localStorage.getItem(STORAGE_KEY_CONDITION)||"{}");
   const now = new Date();
-  const time = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
-  const entries = getCondEntries(today);
+  // 과거 날짜 수정 시엔 시간 기록 없이 저장 (현재시간이 의미 없음)
+  const time = isToday ? `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}` : "";
+  const entries = getCondEntries(targetDate);
   entries.push({val, time});
-  cond[today] = entries;
+  cond[targetDate] = entries;
   localStorage.setItem(STORAGE_KEY_CONDITION, JSON.stringify(cond));
 }
 
@@ -4148,30 +4152,43 @@ function closeCondOverlay(confirm){
 
 // ── 트래킹 모달 (일지 탭) ──
 let _condTrackerVal = 0;
+let _condTrackerDateKey = null; // null = 오늘, 문자열 = 특정 과거 날짜
 
 function openCondTracker(){
   _condTrackerVal = 0;
+  _condTrackerDateKey = null;
   renderCondTracker();
   document.getElementById("condTrackerOverlay").classList.add("show");
 }
 
 function closeCondTracker(){
   document.getElementById("condTrackerOverlay").classList.remove("show");
+  _condTrackerDateKey = null;
 }
 
 function renderCondTracker(){
-  const today = todayDateKey();
-  const entries = getCondEntries(today);
+  const targetDate = _condTrackerDateKey || todayDateKey();
+  const isToday = targetDate === todayDateKey();
+  const entries = getCondEntries(targetDate);
   const el = document.getElementById("condTrackerEntries");
 
   const _u = t();
   const ko = currentLang === "ko";
-  // 오늘 저장된 바이탈 뱃지 표시
-  const todayVitals = getVitals(today);
+
+  // 타이틀 + 저장 버튼 텍스트 동적 업데이트
+  const titleEl = document.getElementById("condTrackerTitleEl");
+  const saveBtn = document.getElementById("condTrackerSaveBtn");
+  if(titleEl) titleEl.textContent = isToday
+    ? (ko ? "📊 오늘 상태 기록" : "📊 Today's Status")
+    : `📊 ${targetDate} ${ko?"기록 수정":"Edit Record"}`;
+  if(saveBtn) saveBtn.textContent = isToday
+    ? (ko ? "지금 시간으로 저장" : "Save Now")
+    : (ko ? `${targetDate} 기록으로 저장` : `Save for ${targetDate}`);
+
+  // 해당 날짜 바이탈 뱃지 표시
+  const dateVitals = getVitals(targetDate);
   let vitalsHTML = "";
-  if(todayVitals){
-    vitalsHTML = buildVitalsBadgeHTML(todayVitals);
-  }
+  if(dateVitals){ vitalsHTML = buildVitalsBadgeHTML(dateVitals); }
 
   if(entries.length === 0){
     el.innerHTML = `<div class="condNoEntry">${_u.condNoEntry}</div>${vitalsHTML}`;
@@ -4192,9 +4209,9 @@ function renderCondTracker(){
   document.getElementById("condTrackerGraph").innerHTML = "";
   renderConditionGraph("condTrackerGraph");
 
-  // 바이탈 입력 그리드 (오늘 저장값 또는 빈 상태)
+  // 바이탈 입력 그리드 (해당 날짜 저장값 또는 빈 상태)
   if(!_vitalsSelections["tracker"]) _vitalsSelections["tracker"] = {};
-  const savedV = getVitals(today);
+  const savedV = getVitals(targetDate);
   _vitalsSelections["tracker"] = savedV ? {...savedV} : {};
   const tGrid = document.getElementById("trackerVitalsGrid");
   if(tGrid) tGrid.innerHTML = buildVitalsGridHTML("tracker", _vitalsSelections["tracker"]);
@@ -4203,7 +4220,6 @@ function renderCondTracker(){
   _condTrackerVal = 0;
   const trackerBtns = document.querySelectorAll("#condTrackerBtns .condBtn");
   if(trackerBtns.length) trackerBtns.forEach(b=> b.classList.remove("selected"));
-  // condTrackerLabel 구버전 UI 잔재 — 제거됨
   document.getElementById("condTrackerSaveBtn").style.display = "none";
 }
 
@@ -4217,14 +4233,14 @@ function selectTrackerCond(val){
 }
 
 function saveTrackerCond(){
-  const today = todayDateKey();
+  const targetDate = _condTrackerDateKey || todayDateKey();
   const sel = _vitalsSelections["tracker"] || {};
   const hasAny = Object.values(sel).some(v=>v>0);
   if(hasAny){
-    saveVitals(today, sel);
-    if(sel.cond > 0) addConditionEntry(sel.cond);
+    saveVitals(targetDate, sel);
+    if(sel.cond > 0) addConditionEntry(sel.cond, targetDate);
   } else if(_condTrackerVal > 0){
-    addConditionEntry(_condTrackerVal);
+    addConditionEntry(_condTrackerVal, targetDate);
   } else {
     return;
   }
