@@ -275,7 +275,8 @@
   .btnrow .secondary{background:var(--card2); color:var(--text); border:1px solid var(--border);}
   textarea#journalOutput{
     width:100%; min-height:260px; background:var(--card2); color:var(--text); border:1px solid var(--border);
-    border-radius:10px; padding:12px; font-size:13.5px; line-height:1.6; white-space:pre-wrap;
+    border-radius:10px; padding:12px; font-size:16px; line-height:1.6;
+    -webkit-user-select:text; user-select:text;
   }
   .historyitem{
     background:var(--card); border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin-bottom:8px; font-size:13px;
@@ -410,8 +411,9 @@
   .exMemoArea{
     display:none; width:100%; min-height:58px; margin-top:7px;
     padding:8px 10px; border-radius:8px; border:1px solid var(--border);
-    background:var(--card2); color:var(--text); font-size:13px;
+    background:var(--card2); color:var(--text); font-size:16px;
     line-height:1.5; resize:vertical; box-sizing:border-box; font-family:inherit;
+    -webkit-user-select:text; user-select:text;
   }
   .exMemoArea.open{ display:block; }
   /* 이전 메모 힌트 */
@@ -2199,6 +2201,10 @@ function generateJournal(){
         }
         lines.push(`  ${i+1}${u.sets}: ${repsStr}${weightStr} ${d ? "✅" : "⬜"}${rirStr}`);
       });
+      // 운동별 메모 포함
+      if(s.note && s.note.trim()){
+        lines.push(`  📝 ${s.note.trim()}`);
+      }
     });
     lines.push("");
   });
