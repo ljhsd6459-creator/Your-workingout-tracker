@@ -305,6 +305,30 @@
   .runLabel{display:block; font-size:12px; color:var(--muted); margin:8px 0 4px;}
   .runOcrStatus{font-size:12.5px; color:var(--accent); margin-top:8px; min-height:16px;}
   .runHint{font-size:12px; color:var(--muted); line-height:1.5; margin:0 0 10px;}
+  /* 러닝 카드 */
+  .runCard{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 15px;margin-bottom:10px;position:relative;}
+  .runCardHeader{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .runCardDate{font-size:12px;color:var(--muted);}
+  .runCardBadge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(74,222,128,.15);color:#4ade80;}
+  .runCardBadge.hiit{background:rgba(251,146,60,.15);color:#fb923c;}
+  .runCardMain{font-size:30px;font-weight:900;color:var(--text);letter-spacing:-1px;line-height:1;}
+  .runCardMainUnit{font-size:14px;font-weight:400;color:var(--muted);margin-left:3px;}
+  .runCardStats{display:flex;flex-wrap:wrap;gap:10px;margin-top:9px;}
+  .runCardStat{font-size:12px;color:var(--muted);}
+  .runCardStat span{color:var(--text);font-weight:600;}
+  .runCardActions{display:flex;gap:6px;margin-top:10px;}
+  .runCardEdit{flex:1;padding:7px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:12px;cursor:pointer;}
+  .runCardDel{padding:7px 12px;border-radius:8px;border:1px solid #5a2e3a;background:transparent;color:#ff8a8a;font-size:12px;cursor:pointer;}
+  /* 러닝 달력 도트 */
+  .calDay.runDay{background:rgba(74,222,128,.2);color:var(--text);cursor:pointer;}
+  .calDay.hiitDay{background:rgba(251,146,60,.18);color:var(--text);cursor:pointer;}
+  .calDay.bothDay{background:linear-gradient(135deg,rgba(74,222,128,.25) 50%,rgba(251,146,60,.25) 50%);color:var(--text);cursor:pointer;}
+  .calDay.runDay.today,.calDay.hiitDay.today,.calDay.bothDay.today{border:1.5px solid var(--accent);}
+  .calDayNum{font-size:11px;line-height:1;}
+  .calDayDots{display:flex;gap:2px;justify-content:center;margin-top:1px;}
+  .calDayDot{width:4px;height:4px;border-radius:50%;}
+  .calDayDot.run{background:#4ade80;}
+  .calDayDot.hiit{background:#fb923c;}
   .modal-overlay{
     position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:50; padding:20px;
   }
@@ -3174,20 +3198,32 @@ function renderRunHistory(){
   list.innerHTML = "";
   runs.forEach((r, idx)=>{
     const div = document.createElement("div");
-    div.className = "historyitem";
-    const distStr = r.distance ? `${r.distance}${r.unit}` : "";
-    const parts = [
-      distStr,
-      r.pace || "",
-      r.time ? `⏱ ${r.time}` : "",
-      r.calories ? `${r.calories}kcal` : "",
-      r.heartRate ? `${r.heartRate}bpm` : "",
-      r.elevation ? `+${r.elevation}m` : "",
-      r.cadence ? `${r.cadence}spm` : ""
+    div.className = "runCard";
+    const dist = r.distance ? parseFloat(r.distance) : null;
+    const unit = r.unit || "km";
+    const stats = [
+      r.pace   ? {icon:"⏱", label:"페이스", val:r.pace} : null,
+      r.time   ? {icon:"🕐", label:"시간",  val:r.time} : null,
+      r.calories?{icon:"🔥", label:"칼로리",val:r.calories+"kcal"}: null,
+      r.heartRate?{icon:"❤️",label:"심박",  val:r.heartRate+"bpm"}: null,
+      r.elevation?{icon:"⛰", label:"고도",  val:"+"+r.elevation+"m"}: null,
+      r.cadence ?{icon:"👟", label:"케이던스",val:r.cadence+"spm"}: null,
     ].filter(Boolean);
-    div.innerHTML = `<div class="hrow"><div class="hdate">${r.date}</div><div style="display:flex;gap:6px;"><button class="hEditBtn" data-idx="${idx}" style="background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 8px;font-size:13px;">✏️</button><button class="hDeleteBtn" data-idx="${idx}">🗑</button></div></div><div>${parts.join(' · ')}</div>`;
-    div.querySelector(".hEditBtn").onclick = (e)=>{ e.stopPropagation(); editRunEntry(idx); };
-    div.querySelector(".hDeleteBtn").onclick = (e)=>{ e.stopPropagation(); deleteRunEntry(idx); };
+    div.innerHTML = `
+      <div class="runCardHeader">
+        <span class="runCardDate">📅 ${r.date}</span>
+        <span class="runCardBadge">🏃 러닝</span>
+      </div>
+      <div>
+        ${dist !== null
+          ? `<span class="runCardMain">${dist % 1 === 0 ? dist.toFixed(0) : dist.toFixed(2)}</span><span class="runCardMainUnit">${unit}</span>`
+          : `<span style="font-size:14px;color:var(--muted)">거리 미기록</span>`}
+      </div>
+      ${stats.length ? `<div class="runCardStats">${stats.map(s=>`<div class="runCardStat">${s.icon} <span>${s.val}</span></div>`).join("")}</div>` : ""}
+      <div class="runCardActions">
+        <button class="runCardEdit" onclick="editRunEntry(${idx})">✏️ 수정</button>
+        <button class="runCardDel" onclick="deleteRunEntry(${idx})">🗑 삭제</button>
+      </div>`;
     list.appendChild(div);
   });
 }
@@ -3248,13 +3284,82 @@ function runCalNextMonth(){
 }
 function renderRunCalendar(){
   const runs = loadRuns();
+  const sprints = (()=>{ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY_SPRINT)||"[]"); }catch(e){return [];} })();
+
   const runsByDate = {};
-  runs.forEach(r=>{ if(!runsByDate[r.date]) runsByDate[r.date] = []; runsByDate[r.date].push(r); });
-  buildCalendarGrid(runCalYear, runCalMonth, runsByDate, "runCal", (dateKey, entries)=>{
-    const totalDist = entries.reduce((sum,e)=> sum + (parseFloat(e.distance)||0), 0);
-    const unit = entries[0].unit || "km";
-    showToast(`${dateKey}: ${totalDist.toFixed(2)}${unit} (${entries.length})`);
-  });
+  runs.forEach(r=>{ if(!runsByDate[r.date]) runsByDate[r.date]=[]; runsByDate[r.date].push(r); });
+  const sprintsByDate = {};
+  sprints.forEach(s=>{ if(!sprintsByDate[s.date]) sprintsByDate[s.date]=[]; sprintsByDate[s.date].push(s); });
+
+  // 달력 헤더/요일 행
+  const u = t();
+  document.getElementById("runCalTitle").textContent = u.calMonthName(runCalYear, runCalMonth);
+  document.getElementById("runCalWeekdays").innerHTML = u.calWeekdays.map(w=>`<div>${w}</div>`).join("");
+
+  const grid = document.getElementById("runCalGrid");
+  grid.innerHTML = "";
+  const firstDayOfWeek = new Date(runCalYear, runCalMonth, 1).getDay();
+  const daysInMonth = new Date(runCalYear, runCalMonth+1, 0).getDate();
+  const todayKey = todayDateKey();
+  const mm = String(runCalMonth+1).padStart(2,"0");
+
+  for(let i=0; i<firstDayOfWeek; i++){
+    const e=document.createElement("div"); e.className="calDay empty"; grid.appendChild(e);
+  }
+  for(let day=1; day<=daysInMonth; day++){
+    const dd = String(day).padStart(2,"0");
+    const dateKey = `${runCalYear}-${mm}-${dd}`;
+    const hasRun = !!runsByDate[dateKey];
+    const hasHiit = !!sprintsByDate[dateKey];
+    const cell = document.createElement("div");
+    cell.className = "calDay";
+    if(hasRun && hasHiit) cell.classList.add("bothDay");
+    else if(hasRun)       cell.classList.add("runDay");
+    else if(hasHiit)      cell.classList.add("hiitDay");
+    if(dateKey === todayKey) cell.classList.add("today");
+
+    // 날짜 숫자 + 도트
+    const dots = [hasRun?"<div class='calDayDot run'></div>":"", hasHiit?"<div class='calDayDot hiit'></div>":""].join("");
+    cell.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+      <span class="calDayNum">${day}</span>
+      ${(hasRun||hasHiit)?`<div class="calDayDots">${dots}</div>`:""}
+    </div>`;
+
+    if((hasRun || hasHiit) && dateKey <= todayKey){
+      cell.style.cursor="pointer";
+      cell.onclick = ()=>{
+        const rList = runsByDate[dateKey]||[];
+        const sList = sprintsByDate[dateKey]||[];
+        let msg = `📅 ${dateKey}\n`;
+        if(rList.length){
+          const dist = rList.reduce((s,e)=>s+(parseFloat(e.distance)||0),0);
+          msg += `🏃 러닝 ${dist.toFixed(2)}${rList[0].unit||"km"}`;
+          if(rList[0].pace) msg += `  페이스 ${rList[0].pace}`;
+          if(rList[0].time) msg += `  ${rList[0].time}`;
+          msg += "\n";
+        }
+        if(sList.length){
+          const s=sList[0];
+          msg += `⚡ HIIT ${s.sets}세트 · ${s.dist} · ${s.sprintTime}초 전력/${s.restTime}초 휴식`;
+        }
+        showToast(msg.trim());
+      };
+    }
+    grid.appendChild(cell);
+  }
+
+  // 범례
+  let legend = document.getElementById("runCalLegend");
+  if(!legend){
+    legend = document.createElement("div");
+    legend.id = "runCalLegend";
+    legend.style.cssText = "display:flex;gap:12px;margin-top:10px;font-size:11px;color:var(--muted);";
+    document.getElementById("runCalendarWrap").appendChild(legend);
+  }
+  legend.innerHTML = `
+    <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#4ade80;margin-right:4px;vertical-align:middle;"></span>러닝</span>
+    <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#fb923c;margin-right:4px;vertical-align:middle;"></span>HIIT</span>
+    <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,#4ade80 50%,#fb923c 50%);margin-right:4px;vertical-align:middle;"></span>둘 다</span>`;
 }
 
 /* ===================== 탭/모달/토스트 ===================== */
