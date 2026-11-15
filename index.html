@@ -446,6 +446,21 @@
   /* ── 건강 대시보드 ── */
   .healthDashOverlay{ position:fixed; inset:0; z-index:9800; background:var(--bg); display:none; flex-direction:column; overflow:hidden; }
   .healthDashOverlay.show{ display:flex; }
+  /* 건강 트렌드 차트 */
+  .healthTrendCard{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px 14px 10px; margin-bottom:14px; }
+  .healthTrendTitle{ font-size:13px; font-weight:700; color:var(--text); margin-bottom:10px; }
+  .healthTrendPeriodRow{ display:flex; gap:6px; margin-bottom:12px; }
+  .healthTrendPeriodBtn{ flex:1; padding:6px 0; border-radius:8px; border:1px solid var(--border); background:var(--card2); color:var(--muted); font-size:12px; font-weight:600; cursor:pointer; }
+  .healthTrendPeriodBtn.active{ background:var(--accent); color:#06201e; border-color:var(--accent); }
+  .healthTrendSvg{ width:100%; display:block; overflow:visible; }
+  .healthTrendLegend{ display:flex; gap:12px; margin-top:8px; flex-wrap:wrap; }
+  .healthTrendLegendItem{ display:flex; align-items:center; gap:4px; font-size:10px; color:var(--muted); }
+  .healthTrendLegendDot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  /* 건강 요약 스탯 (기간 기준) */
+  .healthPeriodStats{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:14px; }
+  .healthPeriodStatBox{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px 8px; text-align:center; }
+  .healthPeriodStatVal{ font-size:20px; font-weight:800; color:var(--text); line-height:1.2; }
+  .healthPeriodStatLabel{ font-size:10px; color:var(--muted); margin-top:2px; }
   .healthDashHeader{ display:flex; align-items:center; justify-content:space-between; padding:16px 16px 10px; background:var(--bg); border-bottom:1px solid var(--border); flex-shrink:0; }
   .healthDashTitle{ font-size:16px; font-weight:700; }
   .healthDashClose{ background:none; border:none; font-size:22px; cursor:pointer; color:var(--muted); padding:2px 8px; border-radius:8px; }
@@ -657,6 +672,25 @@
       <button class="healthNavBtn" id="healthWeekNextBtn" onclick="healthWeekNext()">›</button>
     </div>
     <div class="healthWeekStrip" id="healthWeekStrip"></div>
+    <!-- 트렌드 차트 -->
+    <div class="healthTrendCard">
+      <div class="healthTrendTitle">📈 컨디션 트렌드</div>
+      <div class="healthTrendPeriodRow">
+        <button class="healthTrendPeriodBtn active" id="htPeriod7"   onclick="setHealthPeriod(7)">1주</button>
+        <button class="healthTrendPeriodBtn"        id="htPeriod30"  onclick="setHealthPeriod(30)">1개월</button>
+        <button class="healthTrendPeriodBtn"        id="htPeriod90"  onclick="setHealthPeriod(90)">3개월</button>
+        <button class="healthTrendPeriodBtn"        id="htPeriod365" onclick="setHealthPeriod(365)">1년</button>
+      </div>
+      <svg id="healthTrendSvg" class="healthTrendSvg" height="160"></svg>
+      <div class="healthTrendLegend">
+        <div class="healthTrendLegendItem"><div class="healthTrendLegendDot" style="background:#4ade80"></div>좋음(4~5)</div>
+        <div class="healthTrendLegendItem"><div class="healthTrendLegendDot" style="background:#f59e0b"></div>보통(3)</div>
+        <div class="healthTrendLegendItem"><div class="healthTrendLegendDot" style="background:#ef4444"></div>나쁨(1~2)</div>
+        <div class="healthTrendLegendItem"><div class="healthTrendLegendDot" style="background:var(--accent);border-radius:2px;width:12px;height:4px;"></div>운동</div>
+      </div>
+    </div>
+    <!-- 기간 통계 -->
+    <div class="healthPeriodStats" id="healthPeriodStats"></div>
     <!-- 통계 -->
     <div id="healthStats"></div>
     <!-- 월간 히트맵 -->
@@ -2367,13 +2401,7 @@ function generateJournal(){
         const weightVal = (s.weights && s.weights[i]!==undefined && s.weights[i]!==null && String(s.weights[i]).trim()!=="") ? s.weights[i] : "";
         const weightStr = weightVal!=="" ? ` ${weightVal}${s.unit||"kg"}` : "";
         const repsStr = reps!=="" ? `${reps}${u.repsUnit}` : "";
-        const rirVal = (s.rir && s.rir[i] !== undefined && s.rir[i] !== null) ? s.rir[i] : null;
-        let rirStr = "";
-        if(rirVal !== null){
-          const rirA = getRIRAdvice(rirVal, i+1, s.sets);
-          rirStr = `  │ RIR ${rirVal>=5?"5+":rirVal} ${rirA.emoji} ${rirA.label}`;
-        }
-        lines.push(`  ${i+1}${u.sets}: ${repsStr}${weightStr} ${d ? "✅" : "⬜"}${rirStr}`);
+        lines.push(`  ${i+1}${u.sets}: ${repsStr}${weightStr} ${d ? "✅" : "⬜"}`);
       });
       // 운동별 메모 포함
       if(s.note && s.note.trim()){
@@ -2458,32 +2486,6 @@ function generateJournal(){
         lines.push(ko ? "💧 회복 루틴" : "💧 Recovery");
         recLines.forEach(l=>lines.push(l));
       }
-    }
-  }catch(e){}
-
-  // RIR 요약 섹션 — RIR 데이터가 하나라도 있을 때만 출력
-  try{
-    const rirSummaryLines = [];
-    entries.forEach(id=>{
-      const s = todayState[id];
-      if(!s.rir) return;
-      const hasRir = s.rir.some(v=>v!==null && v!==undefined);
-      if(!hasRir) return;
-      const ex = findExerciseById(s.cat, id);
-      const nm = ex ? getDisplayName(ex) : s.name;
-      const setDetails = s.rir.map((rv,i)=>{
-        if(rv===null || rv===undefined) return null;
-        const a = getRIRAdvice(rv, i+1, s.sets);
-        return `${t().rirSetLabel(i+1,s.sets)} RIR${rv>=5?"5+":rv}(${a.label})`;
-      }).filter(Boolean);
-      if(setDetails.length > 0){
-        rirSummaryLines.push(`  - ${nm}: ${setDetails.join(" → ")}`);
-      }
-    });
-    if(rirSummaryLines.length > 0){
-      lines.push("");
-      lines.push(t().rirSummaryHeader);
-      rirSummaryLines.forEach(l=>lines.push(l));
     }
   }catch(e){}
 
@@ -4140,11 +4142,180 @@ function renderSprintHistory(){
 let _healthWeekOffset = 0;
 let _healthMonthYear = new Date().getFullYear();
 let _healthMonthMo   = new Date().getMonth();
+let _healthTrendPeriod = 7; // 기본 1주
+
+function setHealthPeriod(days){
+  _healthTrendPeriod = days;
+  [7,30,90,365].forEach(d=>{
+    const btn = document.getElementById("htPeriod"+d);
+    if(btn) btn.classList.toggle("active", d===days);
+  });
+  renderHealthTrendChart();
+  renderHealthPeriodStats();
+}
+
+function renderHealthTrendChart(){
+  const svg = document.getElementById("healthTrendSvg"); if(!svg) return;
+  const days = _healthTrendPeriod;
+  const today = todayDateKey();
+
+  // 날짜 목록 생성
+  const dates = [];
+  for(let i=days-1; i>=0; i--){
+    const d = new Date(today+"T00:00:00"); d.setDate(d.getDate()-i);
+    dates.push(d.toISOString().slice(0,10));
+  }
+
+  // 데이터 수집: 컨디션 & 운동 여부
+  const history = (()=>{ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY)||"[]"); }catch(e){return [];} })();
+  const workoutDates = new Set(history.map(h=>h.date));
+  const condData = dates.map(dk=>{
+    const v = getVitals(dk);
+    return { date:dk, cond: v ? (v.cond||null) : null, workout: workoutDates.has(dk) };
+  });
+
+  // 집계 (3개월/1년이면 주간 평균)
+  let points;
+  if(days <= 30){
+    points = condData;
+  } else {
+    // 주간 집계
+    const weeks = [];
+    for(let i=0; i<condData.length; i+=7){
+      const chunk = condData.slice(i, i+7);
+      const condVals = chunk.map(d=>d.cond).filter(v=>v!==null);
+      const avgCond = condVals.length ? condVals.reduce((s,v)=>s+v,0)/condVals.length : null;
+      const hasWorkout = chunk.some(d=>d.workout);
+      weeks.push({ date: chunk[0].date, cond: avgCond ? Math.round(avgCond*10)/10 : null, workout: hasWorkout, isWeek:true });
+    }
+    points = weeks;
+  }
+
+  const W = svg.clientWidth || 320;
+  const H = 160;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+
+  const pad = { t:16, b:30, l:28, r:10 };
+  const iW = W - pad.l - pad.r;
+  const iH = H - pad.t - pad.b;
+  const n = points.length;
+  const xStep = n > 1 ? iW / (n-1) : iW;
+  const yScale = v => pad.t + iH - ((v-1)/4) * iH; // 1→bottom, 5→top
+
+  // 배경 밴드
+  const bandHtml = `
+    <rect x="${pad.l}" y="${pad.t}" width="${iW}" height="${iH*0.5}" rx="0" fill="rgba(74,222,128,.06)"/>
+    <rect x="${pad.l}" y="${pad.t+iH*0.5}" width="${iW}" height="${iH*0.25}" rx="0" fill="rgba(245,158,11,.06)"/>
+    <rect x="${pad.l}" y="${pad.t+iH*0.75}" width="${iW}" height="${iH*0.25}" rx="0" fill="rgba(239,68,68,.06)"/>`;
+
+  // 기준선
+  const gridLines = [2,3,4].map(v=>{
+    const y = yScale(v);
+    return `<line x1="${pad.l}" y1="${y}" x2="${W-pad.r}" y2="${y}" stroke="var(--border)" stroke-width="1" stroke-dasharray="3,3"/>
+    <text x="${pad.l-4}" y="${y+4}" text-anchor="end" font-size="9" fill="var(--muted)">${v}</text>`;
+  }).join("");
+
+  // 운동 마커 (하단 바)
+  const workoutBars = points.map((p,i)=>{
+    if(!p.workout) return "";
+    const x = pad.l + i * xStep;
+    return `<rect x="${x-3}" y="${H-pad.b+4}" width="6" height="6" rx="1" fill="var(--accent)" opacity=".8"/>`;
+  }).join("");
+
+  // 라인 & 도트
+  let pathD = "", dotsHtml = "";
+  let prev = null;
+  points.forEach((p,i)=>{
+    if(p.cond === null){ prev=null; return; }
+    const x = pad.l + i * xStep;
+    const y = yScale(p.cond);
+    const color = p.cond >= 4 ? "#4ade80" : p.cond >= 3 ? "#f59e0b" : "#ef4444";
+    if(prev === null){
+      pathD += `M${x},${y}`;
+    } else {
+      // 부드러운 커브
+      const mx = (prev.x + x) / 2;
+      pathD += ` C${mx},${prev.y} ${mx},${y} ${x},${y}`;
+    }
+    dotsHtml += `<circle cx="${x}" cy="${y}" r="4" fill="${color}" stroke="var(--bg)" stroke-width="1.5"/>`;
+    // 값 라벨 (7일 or 적은 포인트)
+    if(n <= 14){
+      dotsHtml += `<text x="${x}" y="${y-8}" text-anchor="middle" font-size="9" font-weight="700" fill="${color}">${p.cond}</text>`;
+    }
+    prev = {x, y};
+  });
+
+  // X축 날짜 라벨
+  let xLabels = "";
+  const labelStep = Math.max(1, Math.round(n/6));
+  points.forEach((p,i)=>{
+    if(i % labelStep !== 0 && i !== n-1) return;
+    const x = pad.l + i * xStep;
+    const lbl = days <= 30 ? p.date.slice(5) : p.date.slice(5,7)+"/"+p.date.slice(8);
+    xLabels += `<text x="${x}" y="${H-6}" text-anchor="middle" font-size="9" fill="var(--muted)">${lbl}</text>`;
+  });
+
+  const hasData = points.some(p=>p.cond!==null);
+  const noDataMsg = hasData ? "" : `<text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="12" fill="var(--muted)">컨디션 기록이 없어요</text>`;
+
+  svg.innerHTML = `
+    ${bandHtml}
+    <line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${H-pad.b}" stroke="var(--border)" stroke-width="1"/>
+    <line x1="${pad.l}" y1="${H-pad.b}" x2="${W-pad.r}" y2="${H-pad.b}" stroke="var(--border)" stroke-width="1"/>
+    ${gridLines}
+    ${workoutBars}
+    ${pathD ? `<path d="${pathD}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>` : ""}
+    ${dotsHtml}
+    ${xLabels}
+    ${noDataMsg}
+    <text x="${pad.l-4}" y="${pad.t+4}" text-anchor="end" font-size="9" fill="var(--muted)">5</text>
+    <text x="${pad.l-4}" y="${H-pad.b+4}" text-anchor="end" font-size="9" fill="var(--muted)">1</text>`;
+}
+
+function renderHealthPeriodStats(){
+  const el = document.getElementById("healthPeriodStats"); if(!el) return;
+  const days = _healthTrendPeriod;
+  const today = todayDateKey();
+  const dates = [];
+  for(let i=days-1; i>=0; i--){
+    const d = new Date(today+"T00:00:00"); d.setDate(d.getDate()-i);
+    dates.push(d.toISOString().slice(0,10));
+  }
+  const history = (()=>{ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY)||"[]"); }catch(e){return [];} })();
+  const workoutDates = new Set(history.map(h=>h.date));
+  const condVals = dates.map(dk=>{ const v=getVitals(dk); return v?(v.cond||null):null; }).filter(v=>v!==null);
+  const avgCond = condVals.length ? (condVals.reduce((s,v)=>s+v,0)/condVals.length).toFixed(1) : "−";
+  const workoutCnt = dates.filter(dk=>workoutDates.has(dk)).length;
+  const coldCnt = dates.filter(dk=>{ const r=getRecovery(dk); return r&&r.coldShower; }).length;
+  const condEmoji = avgCond!=="−" ? (COND_EMOJI[Math.round(parseFloat(avgCond))]||"") : "";
+  const periodLabel = {7:"1주",30:"1개월",90:"3개월",365:"1년"}[days]||days+"일";
+  el.innerHTML = `
+    <div class="healthPeriodStatBox">
+      <div class="healthPeriodStatVal">${condEmoji} ${avgCond}</div>
+      <div class="healthPeriodStatLabel">${periodLabel} 평균 컨디션</div>
+    </div>
+    <div class="healthPeriodStatBox">
+      <div class="healthPeriodStatVal">${workoutCnt}</div>
+      <div class="healthPeriodStatLabel">${periodLabel} 운동 횟수</div>
+    </div>
+    <div class="healthPeriodStatBox">
+      <div class="healthPeriodStatVal">${coldCnt}</div>
+      <div class="healthPeriodStatLabel">냉수샤워 횟수</div>
+    </div>`;
+}
 
 function openHealthDash(){
   _healthWeekOffset = 0;
+  _healthTrendPeriod = 7;
   _healthMonthYear = new Date().getFullYear();
   _healthMonthMo   = new Date().getMonth();
+  // 기간 버튼 초기화
+  [7,30,90,365].forEach(d=>{
+    const btn = document.getElementById("htPeriod"+d);
+    if(btn) btn.classList.toggle("active", d===7);
+  });
+  renderHealthTrendChart();
+  renderHealthPeriodStats();
   renderHealthWeekStrip();
   renderHealthStats();
   renderHealthMonthGrid();
