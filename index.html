@@ -2401,7 +2401,13 @@ function generateJournal(){
         const weightVal = (s.weights && s.weights[i]!==undefined && s.weights[i]!==null && String(s.weights[i]).trim()!=="") ? s.weights[i] : "";
         const weightStr = weightVal!=="" ? ` ${weightVal}${s.unit||"kg"}` : "";
         const repsStr = reps!=="" ? `${reps}${u.repsUnit}` : "";
-        lines.push(`  ${i+1}${u.sets}: ${repsStr}${weightStr} ${d ? "✅" : "⬜"}`);
+        const rirVal = (s.rir && s.rir[i] !== undefined && s.rir[i] !== null) ? s.rir[i] : null;
+        let rirStr = "";
+        if(rirVal !== null){
+          const rirA = getRIRAdvice(rirVal, i+1, s.sets);
+          rirStr = `  │ RIR ${rirVal>=5?"5+":rirVal} ${rirA.emoji} ${rirA.label}`;
+        }
+        lines.push(`  ${i+1}${u.sets}: ${repsStr}${weightStr} ${d ? "✅" : "⬜"}${rirStr}`);
       });
       // 운동별 메모 포함
       if(s.note && s.note.trim()){
